@@ -1,7 +1,6 @@
 {
   "name": "ganadopro-vercel-ai",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "start": "vercel dev"
