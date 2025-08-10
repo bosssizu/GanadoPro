@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GanadoPro • AI Analyzer</title>
+  <style>
+    :root{--bg:#0b1215;--card:#0f1a1e;--ink:#ecfeff;--muted:#88a0a8;--acc:#10b981;--line:#1f2d33}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:960px;margin:0 auto;padding:20px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.2);padding:16px}
+    .btn{background:var(--acc);color:#002b1f;border:none;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+    .hint{color:var(--muted);font-size:13px}
+    img{max-width:100%;border-radius:12px;border:1px solid var(--line)}
+    textarea, input{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#0a1518;color:var(--ink)}
+    pre{white-space:pre-wrap;background:#071014;border:1px solid var(--line);padding:12px;border-radius:12px;overflow:auto}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <div style="width:36px;height:36px;border-radius:12px;background:var(--acc);color:#002b1f;display:grid;place-items:center;font-weight:700">G</div>
+      <div>
+        <div style="font-weight:700">GanadoPro · AI Analyzer (Vercel + OpenAI)</div>
+        <div class="hint">Sube una foto lateral del animal y ejecuta el análisis IA.</div>
+      </div>
+      <div style="margin-left:auto"><a class="btn ghost" href="https://platform.openai.com/docs/guides/vision" target="_blank">Docs</a></div>
+    </header>
+
+    <div class="card" style="display:grid;gap:12px">
+      <input id="file" type="file" accept="image/*">
+      <div class="hint">Recomendado: vista lateral perpendicular, buena luz y suelo visible.</div>
+      <img id="preview" style="display:none" alt="preview"/>
+      <div style="display:flex;gap:8px">
+        <button id="analyze" class="btn" disabled>Analizar con IA</button>
+        <button id="clear" class="btn ghost">Limpiar</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div style="font-weight:600;margin-bottom:6px">Resultado</div>
+      <pre id="out" class="hint">Sube una imagen y presiona “Analizar con IA”.</pre>
+    </div>
+  </div>
+
+  <script>
+    const $ = (s)=>document.querySelector(s);
+    const file = $("#file"), img=$("#preview"), out=$("#out"), btn=$("#analyze"), clr=$("#clear");
+
+    file.addEventListener('change', async (e)=>{
+      const f = e.target.files[0];
+      if(!f){ img.style.display='none'; btn.disabled=true; return;}
+      const url = URL.createObjectURL(f);
+      img.src=url; img.style.display='block';
+      btn.disabled=false;
+      // Save DataURL for sending
+      const dataUrl = await toDataURL(f);
+      btn.onclick = ()=> runAnalyze(dataUrl);
+    });
+
+    async function toDataURL(file){
+      const reader = new FileReader();
+      return await new Promise((res,rej)=>{
+        reader.onload = ()=> res(reader.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function runAnalyze(dataUrl){
+      out.textContent = "Analizando...";
+      try{
+        const resp = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ imageDataUrl: dataUrl })
+        });
+        const json = await resp.json();
+        out.textContent = JSON.stringify(json, null, 2);
+      }catch(err){
+        out.textContent = "Error: " + err.message;
+      }
+    }
+
+    clr.onclick = ()=>{ file.value=''; img.src=''; img.style.display='none'; out.textContent='Sube una imagen y presiona “Analizar con IA”.'; btn.disabled=true; };
+  </script>
+</body>
+</html>

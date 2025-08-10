@@ -1,0 +1,13 @@
+{
+  "name": "ganadopro-vercel-ai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev",
+    "build": "echo 'Use Vercel to deploy'"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
