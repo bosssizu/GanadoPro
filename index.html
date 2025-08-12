@@ -118,12 +118,19 @@
       </div>
 
     <aside class="grid">
-      <div class="card">
-        <div style="font-weight:700;margin-bottom:6px">Acciones</div>
-        <div class="grid">
-          <button id="btnReanalyze" class="btn ghost" disabled>Reanalizar</button>
-          <a id="healthLink" class="btn ghost" href="#">/api/health</a>
+      
+      <div id="buyCard" class="card">
+        <div style="font-weight:700;margin-bottom:6px">Rango para comprar (recomendado)</div>
+        <div class="kpi">
+          <div><div class="lbl">Decisión</div><div id="buy_dec" class="badge">–</div></div>
+          <div><div class="lbl">Rango recomendado</div><div id="buy_rng" class="val">–</div></div>
         </div>
+        <div class="stat"><div>CRC/kg P25</div><div id="buy_p25">–</div></div>
+        <div class="stat"><div>CRC/kg P50</div><div id="buy_p50">–</div></div>
+        <div class="stat"><div>CRC/kg P75</div><div id="buy_p75">–</div></div>
+        <div class="source" id="buy_note">Carga datos de subasta para precisión.</div>
+      </div>
+    
       </div>
       <div class="card">
         <div style="font-weight:700;margin-bottom:6px">Ayuda (criterios de “No apto”)</div>
@@ -308,6 +315,21 @@
     const j = await resp.json(); return Array.isArray(j.rows)? j.rows: [];
   }
   function refreshFinancePanel(r){
+    function updateAside(dec, q, weight){
+      const nf = new Intl.NumberFormat('es-CR');
+      const b = document.getElementById('buy_dec');
+      b.textContent = dec.label;
+      b.className = 'badge ' + (dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok');
+      const rng = document.getElementById('buy_rng');
+      if(dec.totals && Number.isFinite(dec.totals.recLow) && Number.isFinite(dec.totals.recHigh)){
+        rng.textContent = nf.format(dec.totals.recLow) + ' – ' + nf.format(dec.totals.recHigh);
+      } else { rng.textContent = '—'; }
+      document.getElementById('buy_p25').textContent = q? nf.format(q.p25) : '–';
+      document.getElementById('buy_p50').textContent = q? nf.format(q.p50) : '–';
+      document.getElementById('buy_p75').textContent = q? nf.format(q.p75) : '–';
+      document.getElementById('buy_note').textContent = dec.note + (Number.isFinite(weight)? ' · peso '+nf.format(weight)+' kg' : '');
+    }
+
     const defaultWeights={ternero:180,novillo:350,toro:520,vaquilla:280,vaca:420,repasto:350,macho_criollo:330,novilla:320};
     const rows = loadRows();
     const cat = r?.categoryGuess || 'novillo';
@@ -316,20 +338,18 @@
     const panel = document.getElementById('finance'); panel.style.display='block';
     const nf = new Intl.NumberFormat('es-CR');
     if(!q){
-      // Mostrar decisión basada solo en veredicto si no hay dataset
       const usedW = Number.isFinite(weight)? weight : (defaultWeights[cat]||NaN);
       document.getElementById('fi_p25').textContent='–'; document.getElementById('fi_p50').textContent='–'; document.getElementById('fi_p75').textContent='–';
       document.getElementById('fi_w').textContent=Number.isFinite(usedW)? nf.format(usedW) : '–';
       document.getElementById('fi_sample').textContent='Muestra: 0';
-      const b = document.getElementById('fi_decision');
       let label='Sin datos'; let note='Agrega CSV/Imágenes de subasta para ver precios.'; let cls='warn';
       if(r?.verdictBand==='Muy malo' || r?.verdictBand==='Malo'){ label='NO COMPRAR'; note='Decisión basada en morfología (sin datos de precio).'; cls='bad'; }
       else if(r?.verdictBand==='Regular'){ label='Conservador'; note='Sin datos de precio: negociar solo en rango bajo.'; cls='warn'; }
       else if(r?.verdictBand==='Bueno'){ label='Vale la pena'; note='Sin datos: usar referencia local y revisar costos.'; cls='ok'; }
       else if(r?.verdictBand==='Excelente'){ label='Premium'; note='Sin datos: admite premium si el lote lo amerita.'; cls='ok'; }
-      b.textContent=label; b.className='badge ' + cls;
-      document.getElementById('fi_note').textContent=note;
-      document.getElementById('fi_conservative').textContent='–'; document.getElementById('fi_mid').textContent='–'; document.getElementById('fi_high').textContent='–';
+      const dec = { label, totals:null, note };
+      const b = document.getElementById('fi_decision'); b.textContent=label; b.className='badge ' + cls; document.getElementById('fi_note').textContent=note; document.getElementById('fi_conservative').textContent='–'; document.getElementById('fi_mid').textContent='–'; document.getElementById('fi_high').textContent='–';
+      updateAside(dec, null, usedW);
       return; }
     document.getElementById('fi_p25').textContent = nf.format(q.p25);
     document.getElementById('fi_p50').textContent = nf.format(q.p50);
@@ -342,6 +362,7 @@
     document.getElementById('fi_conservative').textContent = nf.format(dec.totals.low);
     document.getElementById('fi_mid').textContent = nf.format(dec.totals.mid);
     document.getElementById('fi_high').textContent = nf.format(dec.totals.high) + (dec.totals.recHigh? ' (máx recomendado '+nf.format(dec.totals.recHigh)+')' : '');
+    updateAside(dec, q, weight);
   }
 
   fileInp.addEventListener('change', (e)=>{
