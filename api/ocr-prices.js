@@ -1,5 +1,16 @@
+
+function setCORS(res){
+  try{
+    res.setHeader('Access-Control-Allow-Origin','*');
+    res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
+  }catch{}
+}
+
 // /api/ocr-prices.js — OCR for Costa Rica auction summary tables
 module.exports = async function handler(req, res){
+  setCORS(res);
+  if(req.method==='OPTIONS'){ res.status(204).end(); return; }
   try{
     if(req.method!=="POST") return res.status(405).json({error:"Use POST"});
     let body=req.body; if(typeof body==="string"){ try{ body=JSON.parse(body||"{}"); }catch{ body={} } }

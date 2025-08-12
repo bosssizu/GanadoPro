@@ -1,3 +1,12 @@
+
+function setCORS(res){
+  try{
+    res.setHeader('Access-Control-Allow-Origin','*');
+    res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
+  }catch{}
+}
+
 // /api/analyze.js — v2 estricta: pide más señales (cuernos, emaciación, cojera) y aplica guardrails de veredicto.
 function clamp(n,min,max){ return Math.min(max, Math.max(min,n)); }
 function num(x){ const n = Number(x); return Number.isFinite(n)?n:NaN; }
@@ -93,6 +102,8 @@ function heuristicAnalyze(){
 }
 
 module.exports = async function handler(req, res){
+  setCORS(res);
+  if(req.method==='OPTIONS'){ res.status(204).end(); return; }
   try{
     if(req.method!=="POST") return res.status(405).json({error:"Use POST"});
     let body=req.body; if(typeof body==="string"){ try{ body=JSON.parse(body||"{}"); }catch{ body={} } }

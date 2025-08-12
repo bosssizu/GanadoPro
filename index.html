@@ -52,7 +52,8 @@
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <a class="pill" id="health" href="#">API: verificando…</a>
-      <button id="cfgApi" class="pill" type="button">Configurar API</button>
+      <button id="cfgApi" class="pill" type="button" title="Base actual de API">Configurar API</button>
+      <button id="resetApi" class="pill" type="button">Reset API</button>
       <span class="pill">v2 estricta</span>
     </div>
   </header>
@@ -216,6 +217,7 @@
     alert('API base guardada: ' + state.apiBase);
   }
   document.getElementById('cfgApi').onclick = configureApi;
+  document.getElementById('resetApi').onclick = ()=>{ localStorage.removeItem('ganadopro.apiBase'); state.apiBase='/api'; alert('API base restablecida a /api'); checkHealth(); };
 
   function setHealthBadge(text, ok){
     const el = $('#health'); el.textContent = text; el.style.color = ok? '#86efac' : '#fecaca';
