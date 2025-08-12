@@ -41,6 +41,48 @@
     @media (max-width:900px){.row{grid-template-columns:1fr}.kpi{grid-template-columns:repeat(2,minmax(0,1fr))}}
     #dropArea.drag{outline:2px dashed #22d3ee; outline-offset:4px}
 </style>
+
+<script>
+// --- Failsafe minimal controls (runs even if main JS fails) ---
+(function(){
+  function byId(id){ return document.getElementById(id); }
+  function setBadge(text, ok){ var el=byId('health'); if(!el) return; el.textContent = text; el.style.color = ok? '#86efac' : '#fecaca'; }
+  function getApi(){ try{ return localStorage.getItem('ganadopro.apiBase') || '/api'; }catch(e){ return '/api'; } }
+  function saveApi(v){ try{ localStorage.setItem('ganadopro.apiBase', v); }catch(e){} }
+  async function health(){
+    var base = getApi(); var url = (base||'/api').replace(/\/$/, '') + '/health';
+    try{
+      const ctl = new AbortController(); const t=setTimeout(()=>ctl.abort(), 3500);
+      const r = await fetch(url, {signal: ctl.signal}); clearTimeout(t);
+      const j = await r.json(); setBadge(j.hasKey? ('API: OK ('+(j.model||'')+')') : 'API: sin llave', j.hasKey);
+      byId('health').href = url;
+    }catch(e){
+      setBadge('API: error', false); byId('health').href = url;
+    }
+  }
+  window.addEventListener('DOMContentLoaded', function(){
+    // Buttons may not exist if layout changed—guard every access
+    var cfg = byId('cfgApi'); if(cfg){ cfg.onclick = function(){
+      var cur = getApi(); var val = prompt('Base de API (ej: /api o https://tu-app.vercel.app/api)', cur); if(!val) return;
+      saveApi(val); health(); alert('API base guardada: '+val);
+    }; }
+    var rst = byId('resetApi'); if(rst){ rst.onclick = function(){ saveApi('/api'); alert('API base restablecida a /api'); health(); }; }
+    // Upload fallback
+    var file = byId('file'); var btn = byId('btnUpload'); var lbl = byId('lblUpload');
+    if(btn && file){ btn.onclick = function(){ file.click(); }; }
+    if(lbl && file){ lbl.onclick = function(){ file.click(); }; }
+    // Drag & drop highlight
+    var drop = byId('dropArea'); if(drop && file){
+      ['dragenter','dragover'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('drag'); }); });
+      ['dragleave','drop'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('drag'); }); });
+      drop.addEventListener('drop', function(e){ var files = e.dataTransfer && e.dataTransfer.files; if(files && files.length){ file.files = files; file.dispatchEvent(new Event('change')); } });
+    }
+    // Initial health check
+    health();
+  });
+})();
+</script>
+
 </head>
 <body>
 <div class="wrap">
