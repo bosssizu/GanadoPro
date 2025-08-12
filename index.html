@@ -29,7 +29,7 @@
     .warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}
     .bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
     .bar{height:12px;background:#111827;border-radius:999px;overflow:hidden}
-    .bar>i{display:block;height:12px;background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981);width:0}
+    .bar>i{display:block;height:12px;width:0;background:#ef4444;border-radius:999px}
     .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
     .kpi>div{background:#0b1325;border:1px solid #1f2937;border-radius:12px;padding:10px}
     .kpi .lbl{color:#9ca3af;font-size:12px} .kpi .val{font-weight:700}
@@ -60,6 +60,7 @@
       <div class="card">
         <div style="display:flex;gap:12px;align-items:center">
           <label for="file" class="btn primary">Subir imagen del animal</label>
+          <button id="btnReset" class="btn ghost" type="button">Resetear</button>
           <input id="file" type="file" accept="image/*">
           <div id="status" class="source">Esperando imagen…</div>
         </div>
@@ -90,7 +91,9 @@
           <div>
             <div style="font-weight:600;margin-bottom:6px">Condición y salud</div>
             <div class="stat"><div>BCS (1–5)</div><div id="r_bcs">–</div></div>
-            <div style="margin:6px 0;color:#9ca3af">Banderas</div>
+            <div style="margin:6px 0;color:#9ca3af">Precaución principal</div>
+            <div id="mainCaution" class="badge warn" style="display:none"></div>
+            <div style="margin:6px 0;color:#9ca3af">Otras precauciones</div>
             <ul id="flags" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
             <div id="diseaseWrap" style="display:none">
               <div class="source" style="margin-bottom:4px">Posibles enfermedades visibles</div>
@@ -112,11 +115,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <div style="font-weight:600;margin-bottom:6px">Logs / Respuesta cruda</div>
-        <div id="logbox" class="errbox">Sin errores.</div>
       </div>
-    </div>
 
     <aside class="grid">
       <div class="card">
@@ -146,6 +145,38 @@
   const $ = (s)=>document.querySelector(s);
   const nf = new Intl.NumberFormat('es-CR');
   const state = { apiBase: localStorage.getItem('ganadopro.apiBase') || '/api' };
+
+  function flagToEs(f){
+    const dict={
+      "hock_angle_closed":"Corvejón cerrado: vigilar claudicación",
+      "hock_angle_watch":"Ángulo de corvejón subóptimo",
+      "topline_curved":"Dorso curvado: revisar dolor/condición",
+      "steep_rump":"Grupa muy caída: puede afectar locomoción/parto",
+      "underweight":"Condición corporal baja"
+    };
+    return dict[f]||f.replaceAll('_',' ');
+  }
+  function gaugeColor(score){
+    if(score<45) return '#ef4444';      // Muy malo
+    if(score<58) return '#f59e0b';      // Malo
+    if(score<72) return '#eab308';      // Regular
+    if(score<90) return '#10b981';      // Bueno
+    return '#22c55e';                   // Excelente
+  }
+  function resetUI(){
+    const fileInp=document.getElementById('file');
+    const imgWrap=document.getElementById('imgWrap');
+    const report=document.getElementById('report');
+    const status=document.getElementById('status');
+    document.getElementById('preview').src='';
+    imgWrap.style.display='none';
+    report.style.display='none';
+    status.textContent='Esperando imagen…';
+    document.getElementById('scoreBar').style.width='0';
+    document.getElementById('scoreBar').style.background='#ef4444';
+    try{ fileInp.value=''; }catch{}
+  }
+
   $('#year').textContent = new Date().getFullYear();
   $('#health').href = state.apiBase + '/health'; $('#healthLink').href = state.apiBase + '/health';
 
@@ -157,7 +188,7 @@
   window.addEventListener('error', e=> $('#logbox').textContent = 'JS Error: '+e.message);
   window.addEventListener('unhandledrejection', e=> $('#logbox').textContent = 'Promise Rejection: '+(e.reason?.message||e.reason));
 
-  const fileInp = $('#file'); const preview=$('#preview'); const imgWrap=$('#imgWrap'); const status=$('#status'); const btnReanalyze=$('#btnReanalyze');
+  const fileInp = $('#file'); const preview=$('#preview'); const imgWrap=$('#imgWrap'); const status=$('#status'); const btnReanalyze=$('#btnReanalyze'); const btnReset=$('#btnReset'); btnReset.onclick=resetUI;
 
   async function toDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 
@@ -187,12 +218,19 @@
       $('#m_rump').textContent = fmt(r?.morphology?.rumpSlope);
 
       $('#scoreNum').textContent = Number.isFinite(r.score)? r.score : '–';
-      $('#scoreBar').style.width = (Number.isFinite(r.score)? r.score : 0) + '%';
+      const sc = Number.isFinite(r.score)? r.score : 0; $('#scoreBar').style.width = sc + '%'; $('#scoreBar').style.background = gaugeColor(sc);
       const vb = r.verdictBand || '–'; const vEl=$('#verdict'); vEl.textContent = vb; vEl.className = badgeClass(vb);
 
       const flags = Array.isArray(r.healthFlags)? r.healthFlags : []; const ul=$('#flags'); ul.innerHTML='';
-      if(flags.length===0){ const li=document.createElement('li'); li.className='source'; li.textContent='Sin observaciones'; ul.appendChild(li); }
-      else flags.forEach(t=>{ const li=document.createElement('li'); li.textContent = t.replaceAll('_',' '); ul.appendChild(li); });
+      const main = document.getElementById('mainCaution');
+      if(flags.length===0){ main.style.display='none'; const li=document.createElement('li'); li.className='source'; li.textContent='Sin observaciones'; ul.appendChild(li); }
+      else {
+        // Rank main caution by severity
+        const order=['underweight','hock_angle_closed','topline_curved','steep_rump','hock_angle_watch'];
+        const sorted=[...flags].sort((a,b)=> order.indexOf(a)-order.indexOf(b));
+        main.style.display='inline-flex'; main.textContent = flagToEs(sorted[0]);
+        sorted.slice(1).forEach(t=>{ const li=document.createElement('li'); li.textContent = flagToEs(t); ul.appendChild(li); });
+      }
 
       const dis = Array.isArray(r.diseaseFindings)? r.diseaseFindings : []; const dw=$('#diseaseWrap'); const dl=$('#diseases'); dl.innerHTML='';
       if(dis.length){ dw.style.display='block'; dis.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; dl.appendChild(li); }); } else { dw.style.display='none'; }
@@ -200,10 +238,10 @@
       const reasons = Array.isArray(r.verdictReasons)? r.verdictReasons : [];
       $('#r_text').innerHTML = reasons.length ? ('• ' + reasons.join('<br>• ')) : '—';
 
-      $('#logbox').textContent = JSON.stringify(r, null, 2);
+      
       status.textContent = (r.source==='heuristic') ? 'Listo (heurística)' : 'Listo (IA)';
     }catch(err){
-      status.textContent = 'Error'; $('#logbox').textContent = 'Analyze error: '+(err?.message||err);
+      status.textContent = 'Error'; 
     }
   }
 
