@@ -237,6 +237,7 @@
 
       const reasons = Array.isArray(r.verdictReasons)? r.verdictReasons : [];
       $('#r_text').innerHTML = reasons.length ? ('• ' + reasons.join('<br>• ')) : '—';
+      refreshFinancePanel(r);
 
       
       status.textContent = (r.source==='heuristic') ? 'Listo (heurística)' : 'Listo (IA)';
@@ -245,10 +246,99 @@
     }
   }
 
+
+  // ---------- Finance / Dataset ----------
+  const DS_KEY = 'ganadopro.fin.rows';
+  function nfcrc(n){ try{ return new Intl.NumberFormat('es-CR').format(Math.round(n)); } catch { return String(Math.round(n)); } }
+  function loadRows(){ try{ const s=localStorage.getItem(DS_KEY); return s? JSON.parse(s): []; }catch{ return []; } }
+  function saveRows(rows){ try{ localStorage.setItem(DS_KEY, JSON.stringify(rows)); }catch{} }
+  function parseCSVFinance(text){
+    const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(!lines.length) return [];
+    const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
+    const idxCat=headers.indexOf('category')>-1? headers.indexOf('category') : headers.indexOf('tipo');
+    const idxAvg=headers.indexOf('price_per_kg')>-1? headers.indexOf('price_per_kg') : headers.indexOf('precio_promedio_por_kilo');
+    const out=[];
+    for(const line of lines.slice(1)){
+      const cells=line.split(','); const cat=(cells[idxCat]||'').toLowerCase();
+      const v=Number(String((cells[idxAvg]||'')).replace(/[^0-9.\-]/g,'')); if(!Number.isFinite(v)) continue;
+      out.push({ category:cat, perKgAvg:v });
+    }
+    return out;
+  }
+  function pct(arr,p){ const i=Math.max(0, Math.min(arr.length-1, Math.round((p/100)*(arr.length-1)))); return arr[i]; }
+  function quartiles(rows, cat){
+    const map = { 'toros':'toro','toro':'toro','novillo':'novillo','novillos':'novillo','ternero':'ternero','terneros':'ternero','vaquilla':'vaquilla','vaca':'vaca','vaca descarte':'vaca','repasto':'repasto','macho criollo':'macho_criollo' };
+    const target = (map[cat?.toLowerCase?.()]||cat||'').toLowerCase();
+    let filtered = rows.filter(r=> (map[r.category]||r.category)===target);
+    if(filtered.length<3) { // fallback all bovinos
+      filtered = rows.filter(r=> Number.isFinite(r.perKgAvg));
+    }
+    const vals = filtered.map(r=> r.perKgAvg).filter(Number.isFinite).sort((a,b)=>a-b);
+    if(vals.length<3) return null;
+    return { p25:pct(vals,25), p50:pct(vals,50), p75:pct(vals,75), n:vals.length };
+  }
+  function decisionPolicy(verdict, q, weight){
+    if(!q || !Number.isFinite(weight)) return { label:'Sin datos', totals:null, note:'Faltan datos de subasta o peso.' };
+    const low = q.p25*weight, mid=q.p50*weight, high=q.p75*weight;
+    let decision='';
+    let recLow=low, recHigh=high, note='';
+    if(verdict==='Muy malo' || verdict==='Malo'){
+      decision='NO COMPRAR';
+      recLow=0; recHigh=Math.round(low*0.85);
+      note='Condición/estructura deficiente: precio tope por debajo del percentil bajo.';
+    }else if(verdict==='Regular'){
+      decision='Conservador';
+      recLow=low; recHigh=mid;
+      note='Compra solo si el precio se mantiene en rango bajo–medio.';
+    }else if(verdict==='Bueno'){
+      decision='Vale la pena';
+      recLow=mid; recHigh=Math.round(high*1.05);
+      note='Buen biotipo: se puede pagar hasta ~5% sobre P75.';
+    }else{ // Excelente
+      decision='Premium';
+      recLow=mid; recHigh=Math.round(high*1.15);
+      note='Excelente: se admite un premium sobre P75 si el lote lo amerita.';
+    }
+    return { label:decision, totals:{ low, mid, high, recLow, recHigh } , note };
+  }
+  async function toDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
+  async function ocrImages(files){
+    const imgs=[]; for(const f of files){ imgs.push(await toDataURL(f)); }
+    const resp = await fetch(state.apiBase + '/ocr-prices', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ images: imgs }) });
+    const j = await resp.json(); return Array.isArray(j.rows)? j.rows: [];
+  }
+  function refreshFinancePanel(r){
+    const rows = loadRows();
+    const cat = r?.categoryGuess || 'novillo';
+    const weight = Number(r?.weightGuessKg)||NaN;
+    const q = quartiles(rows, cat);
+    const panel = document.getElementById('finance'); panel.style.display='block';
+    const nf = new Intl.NumberFormat('es-CR');
+    if(!q){ document.getElementById('fi_p25').textContent='–'; document.getElementById('fi_p50').textContent='–'; document.getElementById('fi_p75').textContent='–'; document.getElementById('fi_w').textContent=Number.isFinite(weight)? nf.format(weight) : '–'; document.getElementById('fi_sample').textContent='Muestra: 0'; document.getElementById('fi_decision').textContent='Sin datos'; document.getElementById('fi_note').textContent='Carga resúmenes de subasta (CSV o imágenes).'; document.getElementById('fi_conservative').textContent='–'; document.getElementById('fi_mid').textContent='–'; document.getElementById('fi_high').textContent='–'; return; }
+    document.getElementById('fi_p25').textContent = nf.format(q.p25);
+    document.getElementById('fi_p50').textContent = nf.format(q.p50);
+    document.getElementById('fi_p75').textContent = nf.format(q.p75);
+    document.getElementById('fi_w').textContent = Number.isFinite(weight)? nf.format(weight) : '–';
+    document.getElementById('fi_sample').textContent = 'Muestra: '+q.n+' ('+cat+')';
+    const dec = decisionPolicy(r?.verdictBand, q, weight);
+    const b = document.getElementById('fi_decision'); b.textContent = dec.label; b.className = 'badge ' + (dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok');
+    document.getElementById('fi_note').textContent = dec.note;
+    document.getElementById('fi_conservative').textContent = nf.format(dec.totals.low);
+    document.getElementById('fi_mid').textContent = nf.format(dec.totals.mid);
+    document.getElementById('fi_high').textContent = nf.format(dec.totals.high) + (dec.totals.recHigh? ' (máx recomendado '+nf.format(dec.totals.recHigh)+')' : '');
+  }
+
   fileInp.addEventListener('change', (e)=>{
     const f=e.target.files[0]; if(!f) return;
     const url=URL.createObjectURL(f); imgWrap.style.display='block'; preview.src=url;
     analyze(f); btnReanalyze.disabled=false; btnReanalyze.onclick=()=> analyze(f);
+
+  // Finance inputs
+  const fi_csv=document.getElementById('fi_csv'); const fi_imgs=document.getElementById('fi_imgs'); const fi_clear=document.getElementById('fi_clear');
+  fi_csv.addEventListener('change', async (e)=>{ const f=e.target.files[0]; if(!f) return; const txt=await f.text(); const rows=parseCSVFinance(txt); const cur=loadRows(); saveRows([...cur, ...rows]); alert('CSV cargado: '+rows.length+' filas'); });
+  fi_imgs.addEventListener('change', async (e)=>{ const files=[...e.target.files]; if(!files.length) return; const rows=await ocrImages(files); const cur=loadRows(); saveRows([...cur, ...rows]); alert('Imágenes OCR: '+rows.length+' filas'); });
+  fi_clear.addEventListener('click', ()=>{ saveRows([]); alert('Dataset financiero borrado'); });
+
   });
 })();</script>
 </body>

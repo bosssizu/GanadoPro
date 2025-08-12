@@ -1,4 +1,4 @@
-// /api/ocr-prices.js — Extract rows from auction price images via OpenAI Vision
+// /api/ocr-prices.js — OCR for Costa Rica auction summary tables
 module.exports = async function handler(req, res){
   try{
     if(req.method!=="POST") return res.status(405).json({error:"Use POST"});
@@ -8,36 +8,40 @@ module.exports = async function handler(req, res){
     const apiKey=process.env.OPENAI_API_KEY; const model=process.env.OPENAI_MODEL || "gpt-4o-mini";
     if(!apiKey) return res.status(200).json({ rows:[], note:"Sin OPENAI_API_KEY, no OCR." });
 
-    const sys = `Eres un asistente de extracción de datos. Devuelve SOLO JSON válido:
-{ "rows": [ { "date": "YYYY-MM-DD", "category": string, "sex": "macho|hembra", "age_months": number, "weight_kg": number, "price_total_crc": number, "location": string } ... ] }`;
+    const sys = `Eres un extractor para resúmenes de subasta de ganado de Costa Rica.
+Debes devolver SOLO JSON con esta forma:
+{ "rows": [ { "category": string, "perKgAvg": number, "perKgMin": number|null, "perKgMax": number|null, "date": "YYYY-MM-DD"|null, "auction": string|null } ] }
+- "category" normalizada en minúsculas (toro, novillo, ternero, vaquilla, vaca, repasto, macho criollo, bufalo, ternera, novilla).
+- Los números son colones costarricenses (CRC) por kilo.
+- Si hay varias páginas, agrega todas las filas encontradas.`;
 
-    const userText = "Extrae registros de subasta (fecha, categoría, sexo, edad en meses si aparece, peso kg, precio total CRC y ubicación).";
+    const userText = "Extrae de cada imagen la columna 'Precio promedio por kilo' y, si están, 'Precio mínimo' y 'Precio máximo' para cada 'Tipo'.";
 
     const contents = [{ type:"text", text:userText }, ... images.map(url=> ({ type:"image_url", image_url:{ url, detail:"low" } }))];
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method:"POST", headers:{ "content-type":"application/json", "authorization":`Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages:[ {role:"system", content:sys}, {role:"user", content:contents} ], temperature:0 })
+      body: JSON.stringify({ model, response_format:{type:"json_object"}, messages:[ {role:"system", content:sys}, {role:"user", content:contents} ], temperature:0 })
     });
 
     const txt = await resp.text();
     if(!resp.ok) return res.status(resp.status).json({error:"OpenAI error", detail:txt});
     let data; try{ data=JSON.parse(txt); }catch{ return res.status(500).json({error:"OpenAI parse error", detail:txt}); }
-    const content = data?.choices?.[0]?.message?.content?.trim() || "";
-    let out=null; try{ out=JSON.parse(content); }catch{ out=null; }
-    const rows = Array.isArray(out?.rows)? out.rows : [];
-    const norm = (v)=> { const n=Number(String(v).replace(/[^0-9.\-]/g,"")); return Number.isFinite(n)?n:NaN; };
+    const out = data?.choices?.[0]?.message?.content?.trim() || "{}";
+    let j=null; try{ j=JSON.parse(out); }catch{ j=null; }
+    const rows = Array.isArray(j?.rows)? j.rows : [];
+
+    const normNum = (v)=> { const n=Number(String(v).replace(/[^0-9.\-]/g,"")); return Number.isFinite(n)?n:NaN; };
+    const normCat = (c)=> String(c||"").toLowerCase().replace(/\s+/g,' ').trim();
     const rowsN = rows.map(r=> ({
-      date: r.date || null,
-      category: (r.category||"").toLowerCase(),
-      sex: (r.sex||"").toLowerCase(),
-      age_months: norm(r.age_months),
-      weight_kg: norm(r.weight_kg),
-      price_total_crc: norm(r.price_total_crc),
-      location: r.location || null,
-      price_per_kg: (norm(r.price_total_crc) && norm(r.weight_kg)) ? (norm(r.price_total_crc)/norm(r.weight_kg)) : null
-    }));
-    return res.status(200).json({ rows: rowsN.filter(r=>r.price_per_kg && r.weight_kg) });
+      category: normCat(r.category),
+      perKgAvg: normNum(r.perKgAvg),
+      perKgMin: Number.isFinite(normNum(r.perKgMin))? normNum(r.perKgMin) : null,
+      perKgMax: Number.isFinite(normNum(r.perKgMax))? normNum(r.perKgMax) : null,
+      date: r.date || null, auction: r.auction || null
+    })).filter(r=> Number.isFinite(r.perKgAvg));
+
+    return res.status(200).json({ rows: rowsN });
   }catch(err){
     return res.status(500).json({ error: err?.message || "Unknown error" });
   }
