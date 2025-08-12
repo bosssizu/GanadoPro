@@ -3,99 +3,142 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GanadoPro • Auto análisis</title>
+  <title>GanadoPro • Auto análisis (v2)</title>
   <style>
-    :root{--bg:#f6f7fb;--ink:#0f172a;--muted:#64748b;--card:#ffffff;--line:#e2e8f0;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#0ea5e9}
-    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-    .wrap{max-width:980px;margin:0 auto;padding:16px}
-    header{display:flex;align-items:center;gap:12px;margin:8px 0 16px}
-    header .logo{width:40px;height:40px;border-radius:12px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700}
-    .muted{color:var(--muted);font-size:12px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:16px;margin-bottom:12px}
-    .btn{background:#111827;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:14px;cursor:pointer}
-    .btn.ghost{background:#fff;color:#111;border:1px solid var(--line)}
+    :root{
+      --bg:#0b1220; --ink:#e5e7eb; --muted:#9ca3af; --card:#0f172a; --line:#1f2937;
+      --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; --brand:#38bdf8;
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    header{display:flex;align-items:center;gap:12px;margin:6px 0 16px}
+    header .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--brand),#22c55e);color:#0b1220;display:grid;place-items:center;font-weight:900}
+    h1{margin:0;font-size:20px} .sub{color:var(--muted);font-size:12px}
+    .pill{border:1px solid #1f2937;border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .grid{display:grid;gap:12px}
+    .row{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.25);padding:16px}
+    .btn{background:#e5e7eb;color:#0b1220;border:none;border-radius:12px;padding:10px 14px;font-size:14px;cursor:pointer}
+    .btn.primary{background:linear-gradient(135deg,#22d3ee,#22c55e);color:#0b1220;font-weight:700}
+    .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+    label{font-size:12px;color:var(--muted)}
+    .preview{max-width:100%;border-radius:12px;border:1px solid var(--line);background:#0b1325}
+    .stat{display:flex;justify-content:space-between;padding:6px 0;border-top:1px dashed #1f2937;font-size:14px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#0b1325;font-size:12px;color:#cbd5e1}
+    .ok{background:rgba(16,185,129,.15);border-color:#065f46;color:#a7f3d0}
+    .warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}
+    .bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
+    .bar{height:12px;background:#111827;border-radius:999px;overflow:hidden}
+    .bar>i{display:block;height:12px;background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981);width:0}
+    .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .kpi>div{background:#0b1325;border:1px solid #1f2937;border-radius:12px;padding:10px}
+    .kpi .lbl{color:#9ca3af;font-size:12px} .kpi .val{font-weight:700}
+    .errbox{white-space:pre-wrap;background:#1b0f12;color:#fecaca;border:1px solid #7f1d1d;border-radius:12px;padding:10px;font-size:12px}
+    .source{font-size:12px;color:#9ca3af}
+    .divider{height:1px;background:#1f2937;margin:10px 0}
     input[type=file]{display:none}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .stat{display:flex;justify-content:space-between;padding:4px 0;border-top:1px dashed var(--line);font-size:14px}
-    img.preview{max-width:100%;border-radius:12px;border:1px solid var(--line);background:#fff}
-    .badge{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#f8fafc;font-size:12px;color:#334155}
-    .badge.ok{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
-    .badge.warn{background:#fffbeb;color:#92400e;border-color:#fde68a}
-    .badge.bad{background:#fef2f2;color:#991b1b;border-color:#fecaca}
-    .bar{height:12px;background:#e2e8f0;border-radius:999px;overflow:hidden}
-    .bar>i{display:block;height:12px;background:var(--ok);width:0}
-    .errbox{white-space:pre-wrap;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:12px;padding:10px;font-size:12px}
-    footer{margin-top:16px}
+    footer{margin-top:16px;color:#6b7280;font-size:12px}
+    @media (max-width:900px){.row{grid-template-columns:1fr}.kpi{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">G</div>
+    <div class="logo">GP</div>
     <div>
-      <div style="font-weight:700">GanadoPro · Auto análisis</div>
-      <div class="muted">Sube la imagen → informe completo sin seleccionar nada</div>
+      <h1>GanadoPro • Auto análisis (v2)</h1>
+      <div class="sub">Sube la imagen → informe técnico realista (IA + reglas)</div>
     </div>
-    <div style="margin-left:auto" class="muted"><a href="#" id="healthLink">Probar API</a></div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <a class="pill" id="health" href="#">API: verificando…</a>
+      <span class="pill">v2 estricta</span>
+    </div>
   </header>
 
-  <div class="card">
-    <div style="display:flex;gap:12px;align-items:center">
-      <label for="file" class="btn">Subir imagen del animal</label>
-      <input id="file" type="file" accept="image/*">
-      <div id="status" class="muted">Esperando imagen…</div>
-    </div>
-    <div id="imgWrap" style="margin-top:12px;display:none"><img id="preview" class="preview" alt="preview"></div>
-  </div>
+  <div class="row">
+    <div class="grid">
+      <div class="card">
+        <div style="display:flex;gap:12px;align-items:center">
+          <label for="file" class="btn primary">Subir imagen del animal</label>
+          <input id="file" type="file" accept="image/*">
+          <div id="status" class="source">Esperando imagen…</div>
+        </div>
+        <div id="imgWrap" style="margin-top:12px;display:none"><img id="preview" class="preview" alt="preview"></div>
+      </div>
 
-  <div id="report" class="card" style="display:none">
-    <div style="font-weight:600;margin-bottom:6px">Informe técnico</div>
-    <div class="grid2">
-      <div>
-        <div class="stat"><div>Sexo</div><div id="r_sex">–</div></div>
-        <div class="stat"><div>Categoría estimada</div><div id="r_cat">–</div></div>
-        <div class="stat"><div>Edad estimada</div><div id="r_age">–</div></div>
-        <div class="stat"><div>Peso estimado</div><div id="r_w">–</div></div>
-        <div class="stat"><div>Raza / tipo</div><div id="r_breed">–</div></div>
-      </div>
-      <div>
-        <div class="stat"><div>BCS (1–5)</div><div id="r_bcs">–</div></div>
-        <div class="stat"><div>Score de engorda</div><div><span id="r_score">–</span>/100</div></div>
-        <div class="stat"><div>Veredicto</div><div><span id="r_verdict" class="badge">–</span></div></div>
-      </div>
-    </div>
-
-    <div class="grid2" style="margin-top:10px">
-      <div>
-        <div style="font-weight:600;margin-bottom:6px">Morfología</div>
-        <div class="stat"><div>Largo/Alzada</div><div id="m_body">–</div></div>
-        <div class="stat"><div>Prof. abdomen/Alzada</div><div id="m_belly">–</div></div>
-        <div class="stat"><div>Ángulo corvejón (°)</div><div id="m_hock">–</div></div>
-        <div class="stat"><div>Desv. de dorso</div><div id="m_top">–</div></div>
-        <div class="stat"><div>Pendiente de grupa</div><div id="m_rump">–</div></div>
-      </div>
-      <div>
-        <div style="font-weight:600;margin-bottom:6px">Salud visible</div>
-        <ul id="flags" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
-        <div id="diseaseWrap" style="display:none">
-          <div class="muted" style="margin-bottom:4px">Posibles enfermedades visibles</div>
-          <ul id="diseases" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
+      <div id="report" class="card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:700">Informe técnico</div>
+          <div class="source" id="src"></div>
+        </div>
+        <div class="kpi">
+          <div><div class="lbl">Sexo</div><div id="r_sex" class="val">–</div></div>
+          <div><div class="lbl">Categoría</div><div id="r_cat" class="val">–</div></div>
+          <div><div class="lbl">Edad est.</div><div id="r_age" class="val">–</div></div>
+          <div><div class="lbl">Peso est.</div><div id="r_w" class="val">–</div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+          <div>
+            <div style="font-weight:600;margin-bottom:6px">Morfología</div>
+            <div class="stat"><div>Largo/Alzada</div><div id="m_body">–</div></div>
+            <div class="stat"><div>Prof. abdomen/Alzada</div><div id="m_belly">–</div></div>
+            <div class="stat"><div>Ángulo corvejón (°)</div><div id="m_hock">–</div></div>
+            <div class="stat"><div>Desv. de dorso</div><div id="m_top">–</div></div>
+            <div class="stat"><div>Pendiente de grupa</div><div id="m_rump">–</div></div>
+          </div>
+          <div>
+            <div style="font-weight:600;margin-bottom:6px">Condición y salud</div>
+            <div class="stat"><div>BCS (1–5)</div><div id="r_bcs">–</div></div>
+            <div style="margin:6px 0;color:#9ca3af">Banderas</div>
+            <ul id="flags" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
+            <div id="diseaseWrap" style="display:none">
+              <div class="source" style="margin-bottom:4px">Posibles enfermedades visibles</div>
+              <ul id="diseases" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
+            </div>
+          </div>
+          <div>
+            <div style="font-weight:600;margin-bottom:6px">Aptitud para engorda</div>
+            <div class="bar"><i id="scoreBar"></i></div>
+            <div class="source" style="margin-top:6px">Score: <span id="scoreNum">–</span>/100</div>
+            <div style="margin-top:6px">Veredicto: <span id="verdict" class="badge">–</span></div>
+            <div style="margin-top:8px" class="source">Raza/Tipo: <span id="breedTop" style="color:#e5e7eb">–</span></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div style="font-weight:600;margin-bottom:6px">Resumen razonado</div>
+          <div id="r_text" class="source">–</div>
         </div>
       </div>
+
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:6px">Logs / Respuesta cruda</div>
+        <div id="logbox" class="errbox">Sin errores.</div>
+      </div>
     </div>
 
-    <div style="margin-top:10px">
-      <div style="font-weight:600;margin-bottom:6px">Resumen razonado</div>
-      <div id="r_text" class="muted">–</div>
-    </div>
+    <aside class="grid">
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:6px">Acciones</div>
+        <div class="grid">
+          <button id="btnReanalyze" class="btn ghost" disabled>Reanalizar</button>
+          <a id="healthLink" class="btn ghost" href="#">/api/health</a>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:6px">Ayuda (criterios de “No apto”)</div>
+        <ul class="source" style="margin:0 0 0 18px;list-style:disc">
+          <li>BCS &lt; 2.2 → **Muy malo**</li>
+          <li>BCS 2.2–2.6 → **Malo** como máximo</li>
+          <li>Señales de emaciación/enfermedad/cojera → cap de veredicto</li>
+          <li>“Toro” adulto (&gt;30m) → máximo **Regular** para engorda</li>
+        </ul>
+      </div>
+    </aside>
   </div>
 
-  <div class="card">
-    <div style="font-weight:600;margin-bottom:6px">Logs / Errores</div>
-    <div id="logbox" class="errbox">Sin errores.</div>
-  </div>
-
-  <footer class="muted">© <span id="year"></span> GanadoPro. No reemplaza el criterio de un MVZ.</footer>
+  <footer>© <span id="year"></span> GanadoPro.</footer>
 </div>
 
 <script>
@@ -104,45 +147,38 @@
   const nf = new Intl.NumberFormat('es-CR');
   const state = { apiBase: localStorage.getItem('ganadopro.apiBase') || '/api' };
   $('#year').textContent = new Date().getFullYear();
-  $('#healthLink').href = state.apiBase + '/health';
+  $('#health').href = state.apiBase + '/health'; $('#healthLink').href = state.apiBase + '/health';
+
+  function setHealthBadge(text, ok){
+    const el = $('#health'); el.textContent = text; el.style.color = ok? '#86efac' : '#fecaca';
+  }
+  fetch(state.apiBase + '/health').then(r=>r.json()).then(j=> setHealthBadge(j.hasKey? 'API: OK ('+(j.model||'')+')' : 'API: sin llave', j.hasKey)).catch(()=> setHealthBadge('API: error', false));
+
   window.addEventListener('error', e=> $('#logbox').textContent = 'JS Error: '+e.message);
   window.addEventListener('unhandledrejection', e=> $('#logbox').textContent = 'Promise Rejection: '+(e.reason?.message||e.reason));
 
-  function fmt(n,d=2){ return Number.isFinite(n)? n.toFixed(d) : '–'; }
-  function badgeClass(v){ if(v==='Excelente'||v==='Bueno') return 'badge ok'; if(v==='Regular') return 'badge warn'; return 'badge bad'; }
-
-  function summarize(r){
-    const m=r.morphology||{}; const bcs=Number(r.bcs)||NaN;
-    const bits=[];
-    if(Number.isFinite(bcs)){ if(bcs<2.3) bits.push('condición baja (BCS '+bcs.toFixed(1)+')'); else if(bcs>3.8) bits.push('condición alta (BCS '+bcs.toFixed(1)+')'); else bits.push('BCS adecuado ('+bcs.toFixed(1)+')'); }
-    if(Number.isFinite(m.hockAngleDeg)){ if(m.hockAngleDeg<135) bits.push('corvejón cerrado'); else if(m.hockAngleDeg>155) bits.push('corvejón abierto'); else bits.push('corvejón aceptable (~'+Math.round(m.hockAngleDeg)+'°)'); }
-    if(Number.isFinite(m.bodyLenToHeight)){ if(m.bodyLenToHeight>=1.55) bits.push('buen largo corporal'); }
-    if(Number.isFinite(m.toplineDeviation)){ if(m.toplineDeviation>0.12) bits.push('dorso curvado'); else bits.push('línea superior adecuada'); }
-    if(Array.isArray(r.healthFlags) && r.healthFlags.length){ bits.push('banderas: '+r.healthFlags.join(', ')); }
-    const sex = r.sex || 'desconocido';
-    const cat = r.categoryGuess || 'sin categoría';
-    return `Animal ${sex} (${cat}). ${bits.join('; ')}.`;
-  }
+  const fileInp = $('#file'); const preview=$('#preview'); const imgWrap=$('#imgWrap'); const status=$('#status'); const btnReanalyze=$('#btnReanalyze');
 
   async function toDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 
-  $('#file').addEventListener('change', async (e)=>{
-    const f = e.target.files[0]; if(!f) return;
-    $('#status').textContent = 'Analizando…';
-    const url = URL.createObjectURL(f); $('#imgWrap').style.display='block'; $('#preview').src=url;
+  function badgeClass(v){ if(v==='Excelente'||v==='Bueno') return 'badge ok'; if(v==='Regular') return 'badge warn'; return 'badge bad'; }
+  function fmt(n,d=2){ return Number.isFinite(n)? n.toFixed(d) : '–'; }
+
+  async function analyze(file){
+    status.textContent = 'Analizando…';
     try{
-      const dataUrl = await toDataURL(f);
+      const dataUrl = await toDataURL(file);
       const resp = await fetch(state.apiBase + '/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ imageDataUrl: dataUrl }) });
       const r = await resp.json();
 
-      // Fill report
       $('#report').style.display='block';
+      $('#src').textContent = 'Fuente: ' + (r.source==='heuristic' ? 'heurística (sin API/saldo)' : 'IA OpenAI');
       $('#r_sex').textContent = r.sex || '–';
       $('#r_cat').textContent = r.categoryGuess || '–';
       $('#r_age').textContent = Number.isFinite(r.ageGuessMonths) ? (r.ageGuessMonths+' meses') : '–';
-      $('#r_w').textContent = Number.isFinite(r.weightGuessKg) ? (nf.format(Math.round(r.weightGuessKg))+' kg') : '–';
-      $('#r_breed').textContent = (r.breedGuess && r.breedGuess[0]?.breed) ? r.breedGuess[0].breed : '–';
+      $('#r_w').textContent = Number.isFinite(r.weightGuessKg) ? (nf.format(r.weightGuessKg)+' kg') : '–';
       $('#r_bcs').textContent = fmt(Number(r.bcs)||NaN,1);
+      $('#breedTop').textContent = (r.breedGuess && r.breedGuess[0]?.breed) ? r.breedGuess[0].breed : '–';
 
       $('#m_body').textContent = fmt(r?.morphology?.bodyLenToHeight);
       $('#m_belly').textContent = fmt(r?.morphology?.bellyDepthRatio);
@@ -150,25 +186,32 @@
       $('#m_top').textContent = fmt(r?.morphology?.toplineDeviation);
       $('#m_rump').textContent = fmt(r?.morphology?.rumpSlope);
 
-      $('#r_score').textContent = Number.isFinite(r.score)? r.score : '–';
-      const v = r.verdictBand || '–'; const vEl = $('#r_verdict'); vEl.textContent = v; vEl.className = badgeClass(v);
+      $('#scoreNum').textContent = Number.isFinite(r.score)? r.score : '–';
+      $('#scoreBar').style.width = (Number.isFinite(r.score)? r.score : 0) + '%';
+      const vb = r.verdictBand || '–'; const vEl=$('#verdict'); vEl.textContent = vb; vEl.className = badgeClass(vb);
 
       const flags = Array.isArray(r.healthFlags)? r.healthFlags : []; const ul=$('#flags'); ul.innerHTML='';
-      if(flags.length===0){ const li=document.createElement('li'); li.className='muted'; li.textContent='Sin observaciones'; ul.appendChild(li); }
+      if(flags.length===0){ const li=document.createElement('li'); li.className='source'; li.textContent='Sin observaciones'; ul.appendChild(li); }
       else flags.forEach(t=>{ const li=document.createElement('li'); li.textContent = t.replaceAll('_',' '); ul.appendChild(li); });
 
       const dis = Array.isArray(r.diseaseFindings)? r.diseaseFindings : []; const dw=$('#diseaseWrap'); const dl=$('#diseases'); dl.innerHTML='';
       if(dis.length){ dw.style.display='block'; dis.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; dl.appendChild(li); }); } else { dw.style.display='none'; }
 
-      $('#r_text').textContent = (r.verdictReasons && r.verdictReasons.length) ? r.verdictReasons.join(' • ') : summarize(r);
+      const reasons = Array.isArray(r.verdictReasons)? r.verdictReasons : [];
+      $('#r_text').innerHTML = reasons.length ? ('• ' + reasons.join('<br>• ')) : '—';
 
-      $('#status').textContent = (r.source==='heuristic') ? 'Análisis por heurística (sin API o sin saldo)' : 'Análisis IA listo';
       $('#logbox').textContent = JSON.stringify(r, null, 2);
+      status.textContent = (r.source==='heuristic') ? 'Listo (heurística)' : 'Listo (IA)';
     }catch(err){
-      $('#status').textContent = 'Error'; $('#logbox').textContent = 'Analyze error: '+(err?.message||err);
+      status.textContent = 'Error'; $('#logbox').textContent = 'Analyze error: '+(err?.message||err);
     }
+  }
+
+  fileInp.addEventListener('change', (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const url=URL.createObjectURL(f); imgWrap.style.display='block'; preview.src=url;
+    analyze(f); btnReanalyze.disabled=false; btnReanalyze.onclick=()=> analyze(f);
   });
-})();
-</script>
+})();</script>
 </body>
 </html>
