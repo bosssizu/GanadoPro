@@ -11,7 +11,7 @@ module.exports = async function handler(req, res){
     const sys = `Eres un asistente de extracción de datos. Devuelve SOLO JSON válido:
 { "rows": [ { "date": "YYYY-MM-DD", "category": string, "sex": "macho|hembra", "age_months": number, "weight_kg": number, "price_total_crc": number, "location": string } ... ] }`;
 
-    const userText = "Extrae registros de subasta (fecha, categoría, sexo, edad en meses si aparece, peso kg, precio total CRC y ubicación). Usa inferencia obvia si formato lo sugiere. Si unidades dudosas, conviértelas.";
+    const userText = "Extrae registros de subasta (fecha, categoría, sexo, edad en meses si aparece, peso kg, precio total CRC y ubicación).";
 
     const contents = [{ type:"text", text:userText }, ... images.map(url=> ({ type:"image_url", image_url:{ url, detail:"low" } }))];
 
@@ -26,7 +26,6 @@ module.exports = async function handler(req, res){
     const content = data?.choices?.[0]?.message?.content?.trim() || "";
     let out=null; try{ out=JSON.parse(content); }catch{ out=null; }
     const rows = Array.isArray(out?.rows)? out.rows : [];
-    // Normalize
     const norm = (v)=> { const n=Number(String(v).replace(/[^0-9.\-]/g,"")); return Number.isFinite(n)?n:NaN; };
     const rowsN = rows.map(r=> ({
       date: r.date || null,

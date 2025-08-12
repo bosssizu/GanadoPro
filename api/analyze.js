@@ -1,4 +1,4 @@
-// /api/analyze.js — OpenAI Vision (gpt-4o/gpt-4o-mini) with sanitization & diseaseFindings
+// /api/analyze.js — OpenAI Vision (gpt-4o-mini by default) with sanitization & diseaseFindings
 function clamp(n,min,max){ return Math.min(max, Math.max(min,n)); }
 function toNum(x){ const n = Number(x); return Number.isFinite(n)?n:NaN; }
 
@@ -67,7 +67,7 @@ module.exports = async function handler(req, res){
   "bcs": number,
   "breedGuess": [{"breed": string, "pct": number}],
   "healthFlags": [string],
-  "diseaseFindings": [string] // hallazgos visibles: lesiones cutáneas, secreciones nasales, cojera, timpanismo, diarrea, ectoparásitos, heridas, etc.
+  "diseaseFindings": [string]
 }`;
 
     const userText = "Analiza morfología bovina (vista lateral). Estima métricas y BCS (1-5). Reporta posibles enfermedades visibles si las hay.";
