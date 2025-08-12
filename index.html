@@ -273,7 +273,7 @@
                 React.createElement("div",{className:"grid grid-cols-2 gap-2 text-sm"},
                   React.createElement("label",null,"Peso (kg)", React.createElement("input",{type:"number",className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:weightKg,onChange:(e)=>setWeightKg(Number(e.target.value))})),
                   React.createElement("label",null,"Categoría", React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:category,onChange:(e)=>setCategory(e.target.value)}, CATS.map(c=>React.createElement("option",{key:c.id,value:c.id},c.label)))),
-                  React.createElement("label",null,"Sexo", React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value))}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))),
+                  React.createElement("label",null,"Sexo", React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value)}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))),
                 React.createElement("div",{className:"mt-3 space-y-1"},
                   est ? React.createElement(React.Fragment,null,
                     React.createElement(PriceRow,{label:"CRC/kg (P25)",amount:est.perKg.p25}),
@@ -350,7 +350,7 @@
                 React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:category,onChange:(e)=>setCategory(e.target.value)}, CATS.map(c=>React.createElement("option",{key:c.id,value:c.id},c.label)))
               ),
               React.createElement("label",null,"Sexo",
-                React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value))}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))
+                React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value)}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))
               )
             ),
             React.createElement("div",{className:"grid md:grid-cols-2 gap-6 mt-4"},
@@ -406,7 +406,9 @@
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
+    const rootEl = document.getElementById("root");
+    const root = ReactDOM.createRoot(rootEl);
+    window.addEventListener("error", (e)=>{ rootEl.innerHTML = `<pre style=\"white-space:pre-wrap;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px\">JS Error: ${e.message}\n${e.filename}:${e.lineno}</pre>`; });
     root.render(React.createElement(App));
   </script>
 </body>
