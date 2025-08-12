@@ -125,6 +125,7 @@ Si la condición corporal es muy baja o notas emaciación/cojera, refleja eso en
       method:"POST", headers:{ "content-type":"application/json", "authorization":`Bearer ${apiKey}` },
       body: JSON.stringify({
         model, temperature:0.2,
+        response_format:{ type:"json_object" },
         messages:[
           { role:"system", content: sys },
           { role:"user", content: [ {type:"text", text:userText}, {type:"image_url", image_url:{ url:imageDataUrl, detail:"low" }} ] }
@@ -145,6 +146,7 @@ Si la condición corporal es muy baja o notas emaciación/cojera, refleja eso en
     let data; try{ data=JSON.parse(txt); }catch{ return res.status(500).json({error:"OpenAI parse error", detail:txt}); }
     const content = data?.choices?.[0]?.message?.content?.trim() || "";
     let modelOut=null; try{ modelOut=JSON.parse(content); }catch{ modelOut=null; }
+    let note = null; if(!modelOut || !modelOut.morphology){ note = 'parse_fallback'; }
 
     const morph = sanitizeMetrics(modelOut?.morphology||{});
     let bcs = num(modelOut?.bcs); if(!Number.isFinite(bcs)||bcs<1||bcs>5) bcs=estimateBCS(morph);

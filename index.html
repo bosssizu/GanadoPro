@@ -172,7 +172,7 @@
       const r = await resp.json();
 
       $('#report').style.display='block';
-      $('#src').textContent = 'Fuente: ' + (r.source==='heuristic' ? 'heurística (sin API/saldo)' : 'IA OpenAI');
+      $('#src').textContent = 'Fuente: ' + (r.source==='heuristic' ? 'heurística' : 'IA OpenAI') + (r.note ? ' — '+r.note : '');
       $('#r_sex').textContent = r.sex || '–';
       $('#r_cat').textContent = r.categoryGuess || '–';
       $('#r_age').textContent = Number.isFinite(r.ageGuessMonths) ? (r.ageGuessMonths+' meses') : '–';
