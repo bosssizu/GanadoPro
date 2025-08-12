@@ -1,3 +1,5 @@
+// Fixed: use 'image_url' (not 'input_image') for Chat Completions vision
+// Also sets detail:'low' to control cost.
 function heuristicAnalyze() {
   return {
     source: "heuristic",
@@ -9,30 +11,26 @@ function heuristicAnalyze() {
       toplineDeviation: 0.06
     },
     bcs: 3.2,
-    breedGuess: [{breed:"Brahman / Cebú", pct: 40},{breed:"Cruce doble propósito", pct: 35},{breed:"Lechera europea", pct: 25}],
+    breedGuess: [
+      {breed:"Brahman / Cebú", pct: 40},
+      {breed:"Cruce doble propósito", pct: 35},
+      {breed:"Lechera europea", pct: 25}
+    ],
     healthFlags: []
   };
 }
 
 module.exports = async function handler(req, res) {
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Use POST" });
-    }
+    if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
     let body = req.body;
-    if (typeof body === "string") {
-      try { body = JSON.parse(body || "{}"); } catch { body = {}; }
-    }
+    if (typeof body === "string") { try { body = JSON.parse(body || "{}"); } catch { body = {}; } }
     const { imageDataUrl } = body || {};
-    if (!imageDataUrl || typeof imageDataUrl !== "string") {
-      return res.status(400).json({ error: "Missing imageDataUrl" });
-    }
+    if (!imageDataUrl || typeof imageDataUrl !== "string") return res.status(400).json({ error: "Missing imageDataUrl" });
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      // Fallback to local heuristic if no key is configured
-      return res.status(200).json(heuristicAnalyze());
-    }
+    const model = process.env.OPENAI_MODEL || "gpt-4o";
+    if (!apiKey) return res.status(200).json(heuristicAnalyze());
 
     const sys = `Eres un evaluador morfológico bovino. Devuelve solo JSON válido con:
 {
@@ -48,23 +46,20 @@ module.exports = async function handler(req, res) {
   "healthFlags": [string]
 }`;
 
-    const userText = "Analiza la morfología bovina (vista lateral). Estima las métricas solicitadas y el BCS (1-5).";
+    const userText = "Analiza la morfología bovina (vista lateral). Estima las métricas y el BCS (1-5).";
 
-    const oai = await fetch("https://api.openai.com/v1/chat/completions", {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "authorization": `Bearer ${apiKey}`
-      },
+      headers: { "content-type": "application/json", "authorization": `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model,
         messages: [
           { role: "system", content: sys },
           {
             role: "user",
             content: [
               { type: "text", text: userText },
-              { type: "input_image", image_url: { url: imageDataUrl } }
+              { type: "image_url", image_url: { url: imageDataUrl, detail: "low" } }
             ]
           }
         ],
@@ -72,19 +67,24 @@ module.exports = async function handler(req, res) {
       })
     });
 
-    const txt = await oai.text();
-    if (!oai.ok) {
-      return res.status(500).json({ error: "OpenAI error", detail: txt });
+    const txt = await resp.text();
+    if (!resp.ok) {
+      let j = null; try { j = JSON.parse(txt); } catch {}
+      const code = j?.error?.code || "";
+      if (resp.status === 429 || code === "insufficient_quota") {
+        return res.status(200).json({ note: "OpenAI sin cupo; usando heurística.", ...heuristicAnalyze(), source: "heuristic" });
+      }
+      return res.status(resp.status).json({ error: "OpenAI error", detail: txt });
     }
+
     let data;
     try { data = JSON.parse(txt); } catch { return res.status(500).json({ error: "OpenAI parse error", detail: txt }); }
-
     const content = data?.choices?.[0]?.message?.content?.trim() || "";
+
     try {
       const parsed = JSON.parse(content);
       return res.status(200).json({ source: "openai", ...parsed });
-    } catch (e) {
-      // Fallback: return raw text
+    } catch {
       return res.status(200).json({ source: "openai", raw: content, note: "Respuesta no JSON, devolviendo texto bruto." });
     }
   } catch (err) {
