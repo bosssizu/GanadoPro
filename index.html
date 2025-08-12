@@ -245,7 +245,7 @@
                     React.createElement(Stat,{label:"BCS (1–5)",value:fmt(Number(result?.bcs)||NaN,1)}),
                     React.createElement("div",{className:"text-sm text-gray-600 mt-2"},"Banderas"),
                     React.createElement("ul",{className:"mt-1 space-y-1"},
-                      ... (mapFlags(flags).length? mapFlags(flags).map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"amber"},t))) : [React.createElement("li",{key:"none",className:"text-sm text-gray-400"},"Sin observaciones")])
+                      (mapFlags(flags).length? mapFlags(flags).map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"amber"},t))) : [React.createElement("li",{key:"none",className:"text-sm text-gray-400"},"Sin observaciones")])
                     ),
                     diseaseFindings.length>0 && React.createElement(React.Fragment,null,
                       React.createElement("div",{className:"text-sm text-gray-600 mt-3"},"Posibles enfermedades visibles"),
@@ -334,7 +334,7 @@
                   React.createElement(Stat,{label:"BCS",value:fmt(bcs,1)}),
                   React.createElement("div",{className:"text-sm text-gray-600 mt-2"},"Banderas"),
                   React.createElement("ul",{className:"mt-1 space-y-1"},
-                    ... (mapFlags(flags).length? mapFlags(flags).map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"amber"},t))) : [React.createElement("li",{key:"none2",className:"text-sm text-gray-400"},"Sin observaciones")])
+                    (mapFlags(flags).length? mapFlags(flags).map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"amber"},t))) : [React.createElement("li",{key:"none2",className:"text-sm text-gray-400"},"Sin observaciones")])
                   )
                 )
               )
