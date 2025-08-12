@@ -1,89 +1,413 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GanadoPro • AI Analyzer</title>
-  <style>
-    :root{--bg:#0b1215;--card:#0f1a1e;--ink:#ecfeff;--muted:#88a0a8;--acc:#10b981;--line:#1f2d33}
-    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-    .wrap{max-width:960px;margin:0 auto;padding:20px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.2);padding:16px}
-    .btn{background:var(--acc);color:#002b1f;border:none;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
-    .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-    .hint{color:var(--muted);font-size:13px}
-    img{max-width:100%;border-radius:12px;border:1px solid var(--line)}
-    textarea, input{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#0a1518;color:var(--ink)}
-    pre{white-space:pre-wrap;background:#071014;border:1px solid var(--line);padding:12px;border-radius:12px;overflow:auto}
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GanadoPro • Evaluación avanzada</title>
+  <meta name="description" content="GanadoPro: análisis morfológico + veredicto de engorda + precios." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%2310b981'/%3E%3Ctext x='50' y='60' font-size='56' text-anchor='middle' fill='white' font-family='Arial, sans-serif'%3EG%3C/text%3E%3C/svg%3E"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}</style>
 </head>
-<body>
-  <div class="wrap">
-    <header style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <div style="width:36px;height:36px;border-radius:12px;background:var(--acc);color:#002b1f;display:grid;place-items:center;font-weight:700">G</div>
-      <div>
-        <div style="font-weight:700">GanadoPro · AI Analyzer (Vercel + OpenAI)</div>
-        <div class="hint">Sube una foto lateral del animal y ejecuta el análisis IA.</div>
-      </div>
-      <div style="margin-left:auto"><a class="btn ghost" href="https://platform.openai.com/docs/guides/vision" target="_blank">Docs</a></div>
-    </header>
-
-    <div class="card" style="display:grid;gap:12px">
-      <input id="file" type="file" accept="image/*">
-      <div class="hint">Recomendado: vista lateral perpendicular, buena luz y suelo visible.</div>
-      <img id="preview" style="display:none" alt="preview"/>
-      <div style="display:flex;gap:8px">
-        <button id="analyze" class="btn" disabled>Analizar con IA</button>
-        <button id="clear" class="btn ghost">Limpiar</button>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:12px">
-      <div style="font-weight:600;margin-bottom:6px">Resultado</div>
-      <pre id="out" class="hint">Sube una imagen y presiona “Analizar con IA”.</pre>
-    </div>
-  </div>
+<body class="bg-gray-50">
+  <div id="root"></div>
 
   <script>
-    const $ = (s)=>document.querySelector(s);
-    const file = $("#file"), img=$("#preview"), out=$("#out"), btn=$("#analyze"), clr=$("#clear");
+    window.GANADOPRO_API_BASE = localStorage.getItem("ganadopro.apiBase") || "/api";
+  </script>
 
-    file.addEventListener('change', async (e)=>{
-      const f = e.target.files[0];
-      if(!f){ img.style.display='none'; btn.disabled=true; return;}
-      const url = URL.createObjectURL(f);
-      img.src=url; img.style.display='block';
-      btn.disabled=false;
-      // Save DataURL for sending
-      const dataUrl = await toDataURL(f);
-      btn.onclick = ()=> runAnalyze(dataUrl);
-    });
+  <script type="text/javascript">
+    const {useState, useMemo} = React;
 
-    async function toDataURL(file){
-      const reader = new FileReader();
-      return await new Promise((res,rej)=>{
-        reader.onload = ()=> res(reader.result);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
+    // Utils
+    const toDataURL = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    const fmt = (n, d=2)=> Number.isFinite(n) ? n.toFixed(d) : "–";
+    const clamp = (n, min, max)=> Math.min(max, Math.max(min, n));
+
+    const CATS = [
+      { id: "ternero", label: "Ternero" },
+      { id: "novillo", label: "Novillo" },
+      { id: "toro", label: "Toro" },
+      { id: "vaquilla", label: "Vaquilla" },
+      { id: "vaca_descarte", label: "Vaca de descarte" },
+    ];
+    const SEXES = [{ id:"macho", label:"Macho" }, { id:"hembra", label:"Hembra" }];
+
+    // Heuristics for fattening
+    function scoreFattening({ metrics, bcs, sex, ageMonths, category }){
+      let score=0, totalW=0;
+      if(Number.isFinite(bcs)){ const dist=Math.abs(bcs-3.0); let s=100-clamp(dist*40,0,100); const w=0.28; score+=s*w; totalW+=w; }
+      if(Number.isFinite(metrics?.bodyLenToHeight)){ const x=metrics.bodyLenToHeight; let s=100-Math.abs(x-1.65)*180; s=clamp(s,0,100); const w=0.18; score+=s*w; totalW+=w; }
+      if(Number.isFinite(metrics?.hockAngleDeg)){ const x=metrics.hockAngleDeg; let s=100-Math.abs(x-145)*4; s=clamp(s,0,100); const w=0.18; score+=s*w; totalW+=w; }
+      if(Number.isFinite(metrics?.toplineDeviation)){ const x=metrics.toplineDeviation; let s=100-clamp((x-0.08),0,0.42)*(100/0.42); s=clamp(s,0,100); const w=0.14; score+=s*w; totalW+=w; }
+      if(Number.isFinite(metrics?.rumpSlope)){ const x=Math.abs(metrics.rumpSlope); let s=100-clamp(Math.max(0,x-0.12),0,0.3)*(100/0.3); s=clamp(s,0,100); const w=0.10; score+=s*w; totalW+=w; }
+      if(Number.isFinite(ageMonths)){ let adj=1; if(category==="novillo"){ if(ageMonths<8||ageMonths>30) adj=0.9; } else if(category==="ternero"){ adj=0.85; } else if(category==="vaquilla"||category==="vaca_descarte"){ adj=0.9; } else if(category==="toro"){ adj=0.85; } const w=0.12; score+=100*adj*w; totalW+=w; }
+      const final = totalW ? (score/totalW) : 0; return clamp(Math.round(final),0,100);
+    }
+
+    function verdictCategory(score){
+      if(score >= 85) return {label:"Excelente", color:"emerald"};
+      if(score >= 70) return {label:"Bueno", color:"emerald"};
+      if(score >= 55) return {label:"Regular", color:"amber"};
+      if(score >= 40) return {label:"Malo", color:"red"};
+      return {label:"Muy malo", color:"red"};
+    }
+
+    function mapFlags(flags=[]){
+      const dict={
+        hock_angle_closed:"Corvejón cerrado: vigilar claudicación",
+        hock_angle_watch:"Ángulo de corvejón subóptimo",
+        topline_curved:"Dorso curvo: revisar dolor/condición",
+        steep_rump:"Grupa muy caída: impacto locomoción/parto",
+        underweight:"Condición corporal baja",
+      };
+      return flags.map(f=>dict[f]||f);
+    }
+
+    function parseCSV(text){
+      const lines=text.split(/\r?\n/).filter(l=>l.trim().length);
+      if(!lines.length) return [];
+      const headers=lines[0].split(",").map(h=>h.trim());
+      return lines.slice(1).map(line=>{
+        const cells=line.split(",");
+        const obj={}; headers.forEach((h,i)=> obj[h]=(cells[i]??"").trim());
+        const num=(v)=>{ const n=Number(String(v).replace(/[^0-9.\-]/g,"")); return Number.isFinite(n)?n:NaN; }
+        obj.price_total_crc=num(obj.price_total_crc);
+        obj.weight_kg=num(obj.weight_kg);
+        obj.age_months=num(obj.age_months);
+        obj.price_per_kg=(Number.isFinite(obj.price_total_crc)&&Number.isFinite(obj.weight_kg)&&obj.weight_kg>0)?(obj.price_total_crc/obj.weight_kg):NaN;
+        obj.category=(obj.category||"").toLowerCase();
+        obj.sex=(obj.sex||"").toLowerCase();
+        return obj;
       });
     }
 
-    async function runAnalyze(dataUrl){
-      out.textContent = "Analizando...";
-      try{
-        const resp = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ imageDataUrl: dataUrl })
-        });
-        const json = await resp.json();
-        out.textContent = JSON.stringify(json, null, 2);
-      }catch(err){
-        out.textContent = "Error: " + err.message;
+    function estimatePrice({ dataset, category, sex, weightKg }){
+      if(!Array.isArray(dataset)||dataset.length===0||!Number.isFinite(weightKg)) return null;
+      const sameCat = dataset.filter(r=> (r.category||"")===(category||""));
+      const sameSex = sameCat.filter(r=> (r.sex||"")===(sex||""));
+      let window=0.12, pool=sameSex;
+      while(pool.length<15 && window<=0.35){
+        pool = sameSex.filter(r=> Number.isFinite(r.weight_kg) && Math.abs(r.weight_kg-weightKg)/weightKg<=window);
+        window += 0.05;
       }
+      if(pool.length===0) pool = sameSex.length?sameSex : sameCat.length?sameCat : dataset;
+      const prices = pool.map(r=>r.price_per_kg).filter(Number.isFinite).sort((a,b)=>a-b);
+      if(prices.length<3) return null;
+      const pct=(arr,p)=> arr[Math.max(0, Math.min(arr.length-1, Math.round((p/100)*(arr.length-1))))];
+      const p25=pct(prices,25), p50=pct(prices,50), p75=pct(prices,75);
+      return { perKg:{p25,p50,p75}, total:{ low:Math.round(p25*weightKg), mid:Math.round(p50*weightKg), high:Math.round(p75*weightKg) }, sample:pool.length };
     }
 
-    clr.onclick = ()=>{ file.value=''; img.src=''; img.style.display='none'; out.textContent='Sube una imagen y presiona “Analizar con IA”.'; btn.disabled=true; };
+    function Badge({color="gray", children}){
+      const map={ emerald:"bg-emerald-50 text-emerald-700 border-emerald-200",
+                  amber:"bg-amber-50 text-amber-700 border-amber-200",
+                  red:"bg-red-50 text-red-700 border-red-200",
+                  gray:"bg-gray-50 text-gray-700 border-gray-200"};
+      return React.createElement("span",{className:`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs border ${map[color]}`},children);
+    }
+    function Section({title,children,right}){
+      return React.createElement("section",{className:"bg-white rounded-2xl p-4 shadow-sm border"},
+        React.createElement("div",{className:"flex items-center justify-between mb-3"},
+          React.createElement("h3",{className:"font-semibold"},title), right
+        ),
+        children
+      );
+    }
+    const Stat=({label,value,hint})=> React.createElement("div",{className:"flex items-center justify-between py-1 text-sm"},
+      React.createElement("div",{className:"text-gray-600"},label, hint?React.createElement("span",{className:"text-xs text-gray-400"}," – ",hint):null),
+      React.createElement("div",{className:"font-semibold"},value)
+    );
+    const PriceRow=({label,amount,currency="CRC"})=> React.createElement("div",{className:"flex items-center justify-between text-sm"},
+      React.createElement("div",{className:"text-gray-600"},label),
+      React.createElement("div",{className:"font-semibold"}, Number.isFinite(amount)? new Intl.NumberFormat("es-CR").format(amount)+" "+currency : "–")
+    );
+
+    function App(){
+      const [tab,setTab]=useState("analizar");
+      const [sex,setSex]=useState("macho");
+      const [category,setCategory]=useState("novillo");
+      const [ageMonths,setAgeMonths]=useState(18);
+      const [weightKg,setWeightKg]=useState(320);
+      const [fileSide,setFileSide]=useState(null);
+      const [previewUrl,setPreviewUrl]=useState(null);
+      const [busy,setBusy]=useState(false);
+      const [result,setResult]=useState(null);
+      const [apiBase,setApiBase]=useState(window.GANADOPRO_API_BASE || "/api");
+
+      const [dataset,setDataset]=useState(()=>{ try{ const s=localStorage.getItem("ganadopro.dataset"); return s?JSON.parse(s):[] }catch{return []} });
+
+      const est = useMemo(()=> estimatePrice({ dataset, category, sex, weightKg }), [dataset,category,sex,weightKg]);
+      const metrics = result?.morphology || {};
+      const bcs = Number(result?.bcs);
+      const flags = Array.isArray(result?.healthFlags)?result.healthFlags:[];
+      const diseaseFindings = Array.isArray(result?.diseaseFindings)?result.diseaseFindings:[];
+      const breedTop = result?.breedGuess?.[0]?.breed;
+      const fatScore = useMemo(()=> scoreFattening({metrics,bcs,sex,ageMonths,category}), [metrics,bcs,sex,ageMonths,category]);
+      const verdict = verdictCategory(fatScore);
+
+      const onFile=async(f)=>{ if(!f) return; const url=URL.createObjectURL(f); setPreviewUrl(url); setFileSide(f); };
+      async function runAnalyze(){
+        if(!fileSide){ alert("Sube una foto lateral primero."); return; }
+        setBusy(true);
+        try{
+          const dataUrl=await toDataURL(fileSide);
+          const resp=await fetch(apiBase+"/analyze",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ imageDataUrl:dataUrl })});
+          const json=await resp.json(); setResult(json);
+        }catch(e){ alert("Error analizando: "+(e?.message||e)); } finally{ setBusy(false); }
+      }
+
+      async function onCSV(file){
+        if(!file) return;
+        const text=await file.text();
+        const rows=parseCSV(text);
+        setDataset(rows); try{ localStorage.setItem("ganadopro.dataset", JSON.stringify(rows)); }catch{}
+        alert("Dataset cargado: "+rows.length+" registros");
+      }
+
+      async function onOCR(files){
+        if(!files || !files.length) return;
+        const imgs = await Promise.all(Array.from(files).map(f=>toDataURL(f)));
+        const resp = await fetch(apiBase+"/ocr-prices", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ images: imgs }) });
+        const json = await resp.json();
+        if(json?.rows && Array.isArray(json.rows)){
+          const merged = [...dataset, ...json.rows.map(r=>({ ...r, category:(r.category||'').toLowerCase(), sex:(r.sex||'').toLowerCase() }))];
+          setDataset(merged);
+          try{ localStorage.setItem("ganadopro.dataset", JSON.stringify(merged)); }catch{}
+          alert("OCR agregado: "+json.rows.length+" filas");
+        }else{
+          alert("OCR sin filas. Revisa la imagen o logs.");
+        }
+      }
+
+      function saveApiBase(){
+        window.GANADOPRO_API_BASE = apiBase;
+        try{ localStorage.setItem("ganadopro.apiBase", apiBase); }catch{}
+        alert("API base guardada: "+apiBase);
+      }
+
+      return React.createElement("div",{className:"min-h-screen text-gray-900"},
+        React.createElement("div",{className:"max-w-7xl mx-auto p-4 md:p-8"},
+          React.createElement("header",{className:"flex items-center gap-3 mb-6"},
+            React.createElement("div",{className:"w-10 h-10 rounded-2xl bg-emerald-600 text-white font-bold grid place-items-center"},"G"),
+            React.createElement("div",null,
+              React.createElement("h1",{className:"text-xl font-bold"},"GanadoPro · Evaluación avanzada"),
+              React.createElement("p",{className:"text-xs text-gray-500"},"Morfología + Veredicto (muy malo → excelente) + Precios")
+            ),
+            React.createElement("nav",{className:"ml-auto flex gap-2"},
+              ["analizar","reporte","precios","dataset","ajustes"].map(id=> React.createElement("button",{key:id,onClick:()=>setTab(id),className:`px-4 py-2 rounded-2xl text-sm ${tab===id?"bg-black text-white":"bg-white border"}`}, id[0].toUpperCase()+id.slice(1)))
+            )
+          ),
+
+          tab==="analizar" && React.createElement("div",{className:"grid md:grid-cols-3 gap-6"},
+            React.createElement("div",{className:"md:col-span-2 space-y-4"},
+              React.createElement(Section,{title:"Datos del animal"},
+                React.createElement("div",{className:"grid md:grid-cols-4 gap-3"},
+                  React.createElement("label",{className:"text-sm"},"Sexo",
+                    React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value)}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))
+                  ),
+                  React.createElement("label",{className:"text-sm"},"Categoría",
+                    React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:category,onChange:(e)=>setCategory(e.target.value)}, CATS.map(c=>React.createElement("option",{key:c.id,value:c.id},c.label)))
+                  ),
+                  React.createElement("label",{className:"text-sm"},"Edad (meses)",
+                    React.createElement("input",{type:"number",min:0,className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:ageMonths,onChange:(e)=>setAgeMonths(Number(e.target.value))})
+                  ),
+                  React.createElement("label",{className:"text-sm"},"Peso (kg)",
+                    React.createElement("input",{type:"number",min:20,className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:weightKg,onChange:(e)=>setWeightKg(Number(e.target.value))})
+                  ),
+                )
+              ),
+              React.createElement(Section,{title:"Imagen lateral"},
+                React.createElement("div",{className:"flex items-start gap-4"},
+                  React.createElement("div",{className:"flex-1"}, previewUrl? React.createElement("img",{src:previewUrl,alt:"preview",className:"w-full rounded-xl border"}) : React.createElement("div",{className:"text-sm text-gray-500"},"Sube una foto lateral clara, con suelo visible.")),
+                  React.createElement("div",{className:"w-56 space-y-2"},
+                    React.createElement("label",{className:"px-3 py-2 rounded-xl bg-white border text-sm cursor-pointer w-full text-center block"},"Subir imagen",
+                      React.createElement("input",{type:"file",accept:"image/*",className:"hidden",onChange:(e)=>onFile(e.target.files?.[0]||null)})
+                    ),
+                    React.createElement("button",{className:"px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm w-full",disabled:!fileSide||busy,onClick:runAnalyze}, busy?"Analizando…":"Analizar con IA")
+                  )
+                )
+              ),
+              result && React.createElement(Section,{title:"Informe morfológico"},
+                React.createElement("div",{className:"grid md:grid-cols-3 gap-4"},
+                  React.createElement("div",null,
+                    React.createElement("div",{className:"font-semibold mb-2"},"Métricas"),
+                    React.createElement(Stat,{label:"Largo/Alzada",value:fmt(metrics?.bodyLenToHeight)}),
+                    React.createElement(Stat,{label:"Prof. abdomen/Alzada",value:fmt(metrics?.bellyDepthRatio)}),
+                    React.createElement(Stat,{label:"Ángulo corvejón (°)",value:fmt(metrics?.hockAngleDeg)}),
+                    React.createElement(Stat,{label:"Desv. de dorso",value:fmt(metrics?.toplineDeviation)}),
+                    React.createElement(Stat,{label:"Pendiente de grupa",value:fmt(metrics?.rumpSlope)}),
+                  ),
+                  React.createElement("div",null,
+                    React.createElement("div",{className:"font-semibold mb-2"},"Condición y salud"),
+                    React.createElement(Stat,{label:"BCS (1–5)",value:fmt(Number(result?.bcs)||NaN,1)}),
+                    React.createElement("div",{className:"text-sm text-gray-600 mt-2"},"Banderas"),
+                    React.createElement("ul",{className:"mt-1 space-y-1"},
+                      ... (mapFlags(flags).length? mapFlags(flags).map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"amber"},t))) : [React.createElement("li",{key:"none",className:"text-sm text-gray-400"},"Sin observaciones")])
+                    ),
+                    diseaseFindings.length>0 && React.createElement(React.Fragment,null,
+                      React.createElement("div",{className:"text-sm text-gray-600 mt-3"},"Posibles enfermedades visibles"),
+                      React.createElement("ul",{className:"mt-1 space-y-1"}, diseaseFindings.map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"red"},t)))))
+                  ),
+                  React.createElement("div",null,
+                    React.createElement("div",{className:"font-semibold mb-2"},"Aptitud para engorda"),
+                    React.createElement("div",{className:"flex items-center gap-2 mb-1"},
+                      React.createElement("div",{className:`w-2 h-2 rounded-full bg-${verdict.color}-500`}),
+                      React.createElement("div",{className:"text-sm font-semibold"},verdict.label)
+                    ),
+                    React.createElement("div",{className:"text-xs text-gray-500 mb-2"}, "Score ", fatScore, "/100"),
+                    React.createElement("div",{className:"w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-2"},
+                      React.createElement("div",{className:`h-3 bg-${verdict.color}-500`,style:{width: fatScore+"%"}})
+                    ),
+                    React.createElement("div",{className:"font-semibold mt-4 mb-2"},"Raza / Tipo"),
+                    React.createElement("div",{className:"text-sm"},"Sugerida: ", React.createElement("span",{className:"font-semibold"}, breedTop || "–"))
+                  )
+                )
+              )
+            ),
+            React.createElement("aside",{className:"space-y-4"},
+              React.createElement(Section,{title:"Estimación de precio (subasta)"},
+                React.createElement("div",{className:"text-xs text-gray-500 mb-2"},"Usa tu dataset para estimar CRC/kg y total."),
+                React.createElement("div",{className:"grid grid-cols-2 gap-2 text-sm"},
+                  React.createElement("label",null,"Peso (kg)", React.createElement("input",{type:"number",className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:weightKg,onChange:(e)=>setWeightKg(Number(e.target.value))})),
+                  React.createElement("label",null,"Categoría", React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:category,onChange:(e)=>setCategory(e.target.value)}, CATS.map(c=>React.createElement("option",{key:c.id,value:c.id},c.label)))),
+                  React.createElement("label",null,"Sexo", React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value))}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))),
+                React.createElement("div",{className:"mt-3 space-y-1"},
+                  est ? React.createElement(React.Fragment,null,
+                    React.createElement(PriceRow,{label:"CRC/kg (P25)",amount:est.perKg.p25}),
+                    React.createElement(PriceRow,{label:"CRC/kg (P50)",amount:est.perKg.p50}),
+                    React.createElement(PriceRow,{label:"CRC/kg (P75)",amount:est.perKg.p75}),
+                    React.createElement("div",{className:"h-px bg-gray-200 my-2"}),
+                    React.createElement(PriceRow,{label:"Total bajo",amount:est.total.low}),
+                    React.createElement(PriceRow,{label:"Total medio",amount:est.total.mid}),
+                    React.createElement(PriceRow,{label:"Total alto",amount:est.total.high}),
+                    React.createElement("div",{className:"text-xs text-gray-400"},"Muestra usada: ", est.sample)
+                  ) : React.createElement("div",{className:"text-sm text-gray-500"},"Carga un dataset en la pestaña “Dataset”.")
+                ))
+              ),
+              React.createElement(Section,{title:"Acciones"},
+                React.createElement("div",{className:"grid grid-cols-1 gap-2"},
+                  React.createElement("button",{onClick:runAnalyze,className:"px-3 py-2 rounded-xl bg-black text-white text-sm",disabled:!fileSide||busy}, busy?"Analizando…":"Reanalizar"),
+                  React.createElement("button",{onClick:()=>setTab("precios"),className:"px-3 py-2 rounded-xl bg-white border text-sm"},"Ir a Precios"),
+                  React.createElement("button",{onClick:()=>setTab("dataset"),className:"px-3 py-2 rounded-xl bg-white border text-sm"},"Cargar Dataset")
+                )
+              )
+            )
+          ),
+
+          tab==="reporte" && React.createElement(Section,{title:"Reporte consolidado"},
+            !result ? React.createElement("div",{className:"text-sm text-gray-500"},"Primero genera un análisis.") :
+            React.createElement("div",{className:"grid md:grid-cols-3 gap-6"},
+              React.createElement("div",{className:"md:col-span-2 space-y-4"},
+                React.createElement(Section,{title:"Resumen del animal"},
+                  React.createElement("div",{className:"grid md:grid-cols-4 gap-3 text-sm"},
+                    React.createElement("div",null, React.createElement("div",{className:"text-gray-500"},"Sexo"), React.createElement("div",{className:"font-semibold"}, SEXES.find(s=>s.id===sex)?.label)),
+                    React.createElement("div",null, React.createElement("div",{className:"text-gray-500"},"Categoría"), React.createElement("div",{className:"font-semibold"}, CATS.find(c=>c.id===category)?.label)),
+                    React.createElement("div",null, React.createElement("div",{className:"text-gray-500"},"Edad"), React.createElement("div",{className:"font-semibold"}, ageMonths, " meses")),
+                    React.createElement("div",null, React.createElement("div",{className:"text-gray-500"},"Peso"), React.createElement("div",{className:"font-semibold"}, weightKg, " kg")),
+                  )
+                ),
+                React.createElement(Section,{title:"Veredicto de engorda"},
+                  React.createElement("div",{className:"flex items-center gap-3"},
+                    React.createElement(Badge,{color:verdict.color}, verdict.label),
+                    React.createElement("div",{className:"text-sm text-gray-500"},"Score ", fatScore, "/100")
+                  ),
+                  React.createElement("div",{className:"text-sm text-gray-600 mt-2"},"Clasificación: Muy malo / Malo / Regular / Bueno / Excelente.")
+                ),
+                React.createElement(Section,{title:"Estimación de precio"}, est?
+                  React.createElement("div",{className:"grid md:grid-cols-3 gap-4"},
+                    React.createElement("div",null, React.createElement(PriceRow,{label:"CRC/kg (P50)",amount:est.perKg.p50})),
+                    React.createElement("div",null, React.createElement(PriceRow,{label:"Total medio",amount:est.total.mid})),
+                    React.createElement("div",{className:"text-xs text-gray-400"},"Muestra: ", est.sample)
+                  ) : React.createElement("div",{className:"text-sm text-gray-500"},"Agrega tu dataset para estimar precios.")
+                )
+              ),
+              React.createElement("div",{className:"space-y-4"},
+                React.createElement(Section,{title:"Morfología (detalles)"},
+                  React.createElement(Stat,{label:"Largo/Alzada",value:fmt(metrics?.bodyLenToHeight)}),
+                  React.createElement(Stat,{label:"Prof. abdomen/Alzada",value:fmt(metrics?.bellyDepthRatio)}),
+                  React.createElement(Stat,{label:"Ángulo corvejón (°)",value:fmt(metrics?.hockAngleDeg)}),
+                  React.createElement(Stat,{label:"Desv. de dorso",value:fmt(metrics?.toplineDeviation)}),
+                  React.createElement(Stat,{label:"Pendiente de grupa",value:fmt(metrics?.rumpSlope)}),
+                  React.createElement(Stat,{label:"BCS",value:fmt(bcs,1)}),
+                  React.createElement("div",{className:"text-sm text-gray-600 mt-2"},"Banderas"),
+                  React.createElement("ul",{className:"mt-1 space-y-1"},
+                    ... (mapFlags(flags).length? mapFlags(flags).map((t,i)=> React.createElement("li",{key:i},React.createElement(Badge,{color:"amber"},t))) : [React.createElement("li",{key:"none2",className:"text-sm text-gray-400"},"Sin observaciones")])
+                  )
+                )
+              )
+            )
+          ),
+
+          tab==="precios" && React.createElement(Section,{title:"Estimador de precios por subasta (con tu dataset)"},
+            React.createElement("div",{className:"grid md:grid-cols-4 gap-3 text-sm"},
+              React.createElement("label",null,"Peso (kg)",
+                React.createElement("input",{type:"number",className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:weightKg,onChange:(e)=>setWeightKg(Number(e.target.value))})
+              ),
+              React.createElement("label",null,"Categoría",
+                React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:category,onChange:(e)=>setCategory(e.target.value)}, CATS.map(c=>React.createElement("option",{key:c.id,value:c.id},c.label)))
+              ),
+              React.createElement("label",null,"Sexo",
+                React.createElement("select",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:sex,onChange:(e)=>setSex(e.target.value))}, SEXES.map(s=>React.createElement("option",{key:s.id,value:s.id},s.label)))
+              )
+            ),
+            React.createElement("div",{className:"grid md:grid-cols-2 gap-6 mt-4"},
+              React.createElement("div",{className:"bg-gray-50 rounded-xl p-3 border"},
+                React.createElement("div",{className:"font-semibold mb-2"},"Resultado"),
+                est ? React.createElement("div",{className:"space-y-1"},
+                  React.createElement(PriceRow,{label:"CRC/kg (P25)",amount:est.perKg.p25}),
+                  React.createElement(PriceRow,{label:"CRC/kg (P50)",amount:est.perKg.p50}),
+                  React.createElement(PriceRow,{label:"CRC/kg (P75)",amount:est.perKg.p75}),
+                  React.createElement("div",{className:"h-px bg-gray-200 my-2"}),
+                  React.createElement(PriceRow,{label:"Total bajo",amount:est.total.low}),
+                  React.createElement(PriceRow,{label:"Total medio",amount:est.total.mid}),
+                  React.createElement(PriceRow,{label:"Total alto",amount:est.total.high}),
+                  React.createElement("div",{className:"text-xs text-gray-400"},"Muestra: ", est.sample)
+                ) : React.createElement("div",{className:"text-sm text-gray-500"},"Carga un dataset en la pestaña “Dataset”.")
+              ),
+              React.createElement("div",{className:"bg-gray-50 rounded-xl p-3 border"},
+                React.createElement("div",{className:"font-semibold mb-2"},"Sugerencias"),
+                React.createElement("ul",{className:"text-sm list-disc pl-5 space-y-1 text-gray-700"},
+                  React.createElement("li",null,"Usa categorías coherentes: ternero, novillo, toro, vaquilla, vaca_descarte."),
+                  React.createElement("li",null,"Incluye columnas: ", React.createElement("code",null,"date, category, sex, age_months, weight_kg, price_total_crc, location"),"."),
+                  React.createElement("li",null,"Más registros por rango de peso → más precisión.")
+                )
+              )
+            )
+          ),
+
+          tab==="dataset" && React.createElement(Section,{title:"Tu dataset de subastas (CSV / OCR)"},
+            React.createElement("div",{className:"text-sm text-gray-600 mb-2"},"Sube CSV (", React.createElement("code",null,"date,category,sex,age_months,weight_kg,price_total_crc,location"), ") o imágenes (recibos/tablones) para OCR con IA."),
+            React.createElement("div",{className:"flex items-center gap-3"},
+              React.createElement("label",{className:"px-3 py-2 rounded-xl bg-white border text-sm cursor-pointer"},"Subir CSV",
+                React.createElement("input",{type:"file",accept:".csv,text/csv",className:"hidden",onChange:(e)=> onCSV(e.target.files?.[0]||null)})
+              ),
+              React.createElement("label",{className:"px-3 py-2 rounded-xl bg-white border text-sm cursor-pointer"},"Subir imágenes (JPG/PNG)",
+                React.createElement("input",{type:"file",accept:"image/*",multiple:true,className:"hidden",onChange:(e)=> onOCR(e.target.files)})
+              ),
+              React.createElement("button",{className:"px-3 py-2 rounded-xl bg-white border text-sm",onClick:()=>{ setDataset([]); localStorage.removeItem("ganadopro.dataset"); }},"Borrar dataset")
+            ),
+            React.createElement("div",{className:"mt-3 text-xs text-gray-500"},"Registros cargados: ", dataset.length)
+          ),
+
+          tab==="ajustes" && React.createElement(Section,{title:"Ajustes (API)"},
+            React.createElement("div",{className:"grid md:grid-cols-2 gap-3 text-sm"},
+              React.createElement("label",null,"API base (", React.createElement("code",null,"/api"), " si usas Vercel; o ", React.createElement("code",null,"https://tu-app.vercel.app/api"), " si usas GitHub Pages)",
+                React.createElement("input",{className:"w-full mt-1 border rounded-xl px-3 py-2 text-sm",value:apiBase,onChange:(e)=>setApiBase(e.target.value)})
+              ),
+              React.createElement("div",null, React.createElement("button",{className:"px-3 py-2 rounded-xl bg-black text-white text-sm mt-6",onClick:saveApiBase},"Guardar"))
+            )
+          ),
+
+          React.createElement("footer",{className:"mt-10 text-xs text-gray-400"}, "© ", new Date().getFullYear()," GanadoPro. No reemplaza el criterio de un MVZ.")
+        )
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(React.createElement(App));
   </script>
 </body>
 </html>
