@@ -1,5 +1,5 @@
 {
-  "name": "ganadopro-v39",
+  "name": "ganadopro-v39-2",
   "private": true,
   "scripts": {
     "dev": "vercel dev",

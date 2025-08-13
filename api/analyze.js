@@ -5,10 +5,10 @@ function clamp(n,min,max){ return Math.min(max, Math.max(min,n)); }
 function num(x){ const n=Number(x); return Number.isFinite(n)?n:NaN; }
 function sanitizeMetrics(m){ let bodyLenToHeight=num(m?.bodyLenToHeight); let bellyDepthRatio=num(m?.bellyDepthRatio); let hockAngleDeg=num(m?.hockAngleDeg); let rumpSlope=num(m?.rumpSlope); let toplineDeviation=num(m?.toplineDeviation); if(!Number.isFinite(bodyLenToHeight)) bodyLenToHeight=1.55; bodyLenToHeight=clamp(bodyLenToHeight,1.05,2.3); if(!Number.isFinite(bellyDepthRatio)) bellyDepthRatio=0.58; if(bellyDepthRatio>1 && bellyDepthRatio<=100) bellyDepthRatio/=100; bellyDepthRatio=clamp(bellyDepthRatio,0.25,1.05); if(!Number.isFinite(hockAngleDeg)) hockAngleDeg=145; hockAngleDeg=clamp(hockAngleDeg,110,180); if(Number.isFinite(rumpSlope)){ if(Math.abs(rumpSlope)>1 && Math.abs(rumpSlope)<=40) rumpSlope/=100; } else rumpSlope=0.06; rumpSlope=clamp(rumpSlope,-0.35,0.35); if(Number.isFinite(toplineDeviation)){ if(toplineDeviation>1 && toplineDeviation<=60) toplineDeviation/=100; } else toplineDeviation=0.06; toplineDeviation=clamp(toplineDeviation,0,0.6); return { bodyLenToHeight, bellyDepthRatio, hockAngleDeg, rumpSlope, toplineDeviation }; }
 function estimateBCS({bellyDepthRatio,toplineDeviation,rumpSlope}){ let base=3; if(Number.isFinite(bellyDepthRatio)){ if(bellyDepthRatio<0.45) base-=0.9; else if(bellyDepthRatio>0.65) base+=0.7; } if(Number.isFinite(toplineDeviation)){ if(toplineDeviation>0.12) base-=0.6; if(toplineDeviation<0.04) base+=0.2; } if(Number.isFinite(rumpSlope) && rumpSlope>0.12) base-=0.2; return Math.max(1, Math.min(5, Number(base.toFixed(1)))); }
-function flagsFromMetrics({hockAngleDeg,toplineDeviation,rumpSlope},bcs,category,ageMonths,posture){ const flags=[]; // thresholds suavizados + verificación de fiabilidad
+function flagsFromMetrics({hockAngleDeg,toplineDeviation,rumpSlope},bcs,category,ageMonths,posture){ const flags=[]; // thresholds + fiabilidad
   const young = (category==='ternero' || category==='novillo') && Number.isFinite(ageMonths) && ageMonths<=18;
-  const closedTh = young ? 130 : 132;    // antes 135
-  const watchTh  = young ? 140 : 142;    // antes 145
+  const closedTh = young ? 130 : 132;    // jóvenes toleran más
+  const watchTh  = young ? 140 : 142;
   const rotated = posture && Number.isFinite(posture.rotationDeg) && posture.rotationDeg>15;
   const notSide = posture && typeof posture.view==='string' && !/side|lateral/i.test(posture.view);
   const occluded = posture && (posture.occlusion===true || posture.truncation===true || posture.blur===true || posture.shadowStrong===true);
@@ -59,14 +59,14 @@ export default async function handler(req,res){
     const key=process.env.OPENAI_API_KEY; const model=process.env.OPENAI_MODEL||'gpt-4o-mini';
     if(!key) return res.status(200).json(heuristic());
 
-    // PASO 1: extracción + postura
+    // PASO 1: extracción numérica + postura (anti-defaults, detail: high)
     const sys1 = "Eres un evaluador de ganado para engorde. Devuelve SOLO JSON con métricos numéricos estrictos dentro de rangos fisiológicos.";
-    const user1 = {type:'text', text: "Extrae: morphology{bodyLenToHeight(1.0-2.5), bellyDepthRatio(0.2-1.2), hockAngleDeg(110-180), rumpSlope(-0.4-0.4), toplineDeviation(0.0-0.6)}, bcs(1-5), sex('macho'/'hembra'), categoryGuess('ternero','novillo','toro','vaca','novilla','vaquilla','macho criollo'), ageGuessMonths, weightGuessKg, diseaseFindings[], posture{view, rotationDeg, occlusion, truncation, blur, lighting, shadowStrong}. Devuelve SOLO JSON."};
+    const user1 = {type:'text', text: "Extrae EXCLUSIVAMENTE desde la IMAGEN (no inventes). Si alguna medida NO es visible/fiable por rotación, oclusión o blur, devuélvela como null y explica en 'posture'. Evita valores redondos por defecto (1.50, 0.50, 130, 0.30, 0.10). Usa decimales realistas. Campos: morphology{bodyLenToHeight(1.0-2.5), bellyDepthRatio(0.2-1.2), hockAngleDeg(110-180), rumpSlope(-0.4-0.4), toplineDeviation(0.0-0.6)}, bcs(1-5), sex('macho'/'hembra'), categoryGuess('ternero','novillo','toro','vaca','novilla','vaquilla','macho criollo'), ageGuessMonths, weightGuessKg, diseaseFindings[], posture{view, rotationDeg, occlusion, truncation, blur, lighting, shadowStrong}. SOLO JSON."};
     let out1;
     try{
       out1 = await openaiJSON(key, model, [
         {role:'system', content: sys1},
-        {role:'user', content: [ user1, {type:'image_url', image_url:{url:imageDataUrl, detail:'low'}} ]}
+        {role:'user', content: [ user1, {type:'image_url', image_url:{url:imageDataUrl, detail:'high'}} ]}
       ]);
     }catch(e){
       return res.status(200).json(heuristic());
@@ -79,6 +79,18 @@ export default async function handler(req,res){
     const ageGuessMonths= num(out1.ageGuessMonths); const weightGuessKg=num(out1.weightGuessKg);
     const posture = out1.posture || null;
     const diseaseFindings = Array.isArray(out1.diseaseFindings) ? out1.diseaseFindings.slice(0,10) : [];
+    // Anti-defaults detector
+    let defaultsSuspect = false;
+    try{
+      const m = morph || {};
+      const near = (a,b,eps)=> Number.isFinite(a) && Math.abs(a-b) <= eps;
+      if ( near(m.bodyLenToHeight,1.50,0.03) &&
+           near(m.bellyDepthRatio,0.50,0.03) &&
+           near(m.hockAngleDeg,130,2) &&
+           near(m.toplineDeviation,0.30,0.03) &&
+           near(m.rumpSlope,0.10,0.03) ) { defaultsSuspect = true; }
+    }catch(_){}
+
     const healthFlags = flagsFromMetrics(morph,bcs,categoryGuess,ageGuessMonths,posture);
     const prelimScore = scoreFattening({metrics:morph,bcs,sex,ageMonths:ageGuessMonths,category:categoryGuess});
     let prelimVerdict = bandFromScore(prelimScore);
@@ -109,9 +121,10 @@ export default async function handler(req,res){
 
     // Veredicto final
     let band = prelimVerdict;
+    if(defaultsSuspect){ auditText = (auditText? auditText+' ' : '') + 'Detección: valores genéricos sospechosos. Repite la foto lateral o reintenta.'; }
     if(auditCap){ band = minBand(band, auditCap); }
     if(cap1){ band = minBand(band, cap1); }
-    if(auditHardGates.length){ band = minBand(band, 'Malo'); } // solo para gates reales
+    if(auditHardGates.length){ band = minBand(band, 'Malo'); }
 
     const json = {
       source:'openai',
@@ -128,7 +141,8 @@ export default async function handler(req,res){
       verdictBand: band,
       auditText,
       auditHardGates: auditHardGates,
-      diseaseFindings: diseaseFindings
+      diseaseFindings: diseaseFindings,
+      note: defaultsSuspect ? 'resultados_sospechosos' : undefined
     };
     return res.status(200).json(json);
   }catch(err){
