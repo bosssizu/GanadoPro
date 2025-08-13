@@ -1,282 +1,59 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GanadoPro • v31b</title>
-  <style>
-    :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
-    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-    .wrap{max-width:1100px;margin:0 auto;padding:16px}
-    header{display:flex;align-items:center;gap:10px}
-    .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,var(--brand));display:grid;place-items:center;color:#0b1220;font-weight:900}
-    .pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted);background:#0b1325}
-    .row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
-    .grid{display:grid;gap:12px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
-    .btn{background:#e5e7eb;color:#0b1220;border:none;border-radius:10px;padding:10px 14px;font-size:14px;cursor:pointer}
-    .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-    #dropArea.drag{outline:2px dashed var(--brand);outline-offset:4px}
-    .stat{display:flex;justify-content:space-between;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
-    .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-    .kpi>div{background:#0b1325;border:1px solid var(--line);border-radius:12px;padding:10px}
-    .lbl{color:var(--muted);font-size:12px}.val{font-weight:700}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#0b1325;font-size:12px;color:#cbd5e1}
-    .ok{background:rgba(16,185,129,.15);border-color:#065f46;color:#a7f3d0}
-    .warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}
-    .bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
-    .bar{height:12px;background:#111827;border-radius:999px;overflow:hidden}.bar>i{display:block;height:12px;width:0;background:#ef4444;border-radius:999px}
-    .preview{max-width:100%;border-radius:12px;border:1px solid var(--line)}
-    details.diag{margin-left:auto}.diag pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);padding:8px;border-radius:8px;color:#9ca3af;max-height:180px;overflow:auto}
-    @media (max-width:900px){.row{grid-template-columns:1fr}.kpi{grid-template-columns:repeat(2,minmax(0,1fr))}}
-  </style>
-  <script>
-// ---- Failsafe (early) ----
-(function(){
-  function byId(id){return document.getElementById(id)}
-  function getApi(){try{return localStorage.getItem('ganadopro.apiBase')||'/api'}catch(e){return '/api'}}
-  function saveApi(v){try{localStorage.setItem('ganadopro.apiBase',v)}catch(e){}}
-  function setBadge(text,ok){var el=byId('health');if(!el)return;el.textContent=text;el.style.color=ok?'#86efac':'#fecaca'}
-  async function health(){var base=getApi();var url=(base||'/api').replace(/\/$/,'')+'/health';try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),3500);const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);const j=await r.json();setBadge(j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave',j.hasKey);byId('health').href=url}catch(e){setBadge('API: error',false);byId('health').href=url}}
-  window.addEventListener('DOMContentLoaded',function(){
-    var cfg=byId('cfgApi');if(cfg){cfg.onclick=function(){var cur=getApi();var val=prompt('Base de API (ej: /api o https://tuapp.vercel.app/api)',cur);if(!val)return;saveApi(val);health();alert('API base guardada: '+val)}};
-    var rst=byId('resetApi');if(rst){rst.onclick=function(){saveApi('/api');alert('API base restablecida a /api');health();}};
-    var file=byId('file');var btn=byId('btnUpload');var lbl=byId('lblUpload');if(btn&&file)btn.onclick=function(){file.click()};if(lbl&&file)lbl.onclick=function(){file.click()};
-    var drop=byId('dropArea');if(drop&&file){['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));drop.addEventListener('drop',e=>{var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length){file.files=fs;file.dispatchEvent(new Event('change'))}})}
-    health();
-  });
-})();
-  </script>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <div class="logo">GP</div>
-    <div>
-      <div style="font-weight:800;font-size:20px">GanadoPro • v31b</div>
-      <div style="color:var(--muted);font-size:12px">Análisis IA + reglas · Subastas · Rango de compra</div>
-    </div>
-    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-      <a class="pill" id="health" href="#">API: verificando…</a>
-      <button id="cfgApi" class="pill" type="button">Configurar API</button>
-      <button id="resetApi" class="pill" type="button">Reset API</button>
-      <details class="diag pill"><summary>Diagnóstico</summary><pre id="diag"></pre></details>
-    </div>
-  </header>
-
-  <div class="row">
-    <div class="grid">
-      <div class="card" id="dropArea">
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <label for="file" class="btn" id="lblUpload">Subir imagen</label>
-          <button id="btnUpload" class="btn ghost" type="button">Elegir</button>
-          <input id="file" type="file" accept="image/*" capture="environment" style="display:none">
-          <input id="fileNative" type="file" accept="image/*" style="background:#0b1325;color:#e5e7eb;border:1px solid var(--line);border-radius:8px;padding:8px">
-          <button id="btnReset" class="btn ghost" type="button">Reset</button>
-          <div id="status" class="pill">Listo para cargar (puedes pegar o arrastrar imagen)</div>
-        </div>
-        <div id="imgWrap" style="margin-top:10px;display:none"><img id="preview" class="preview" alt="preview"></div>
-      </div>
-
-      <div id="report" class="card" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-weight:700">Informe técnico</div>
-          <div id="src" style="font-size:12px;color:var(--muted)"></div>
-        </div>
-        <div class="kpi">
-          <div><div class="lbl">Sexo</div><div id="r_sex" class="val">–</div></div>
-          <div><div class="lbl">Categoría</div><div id="r_cat" class="val">–</div></div>
-          <div><div class="lbl">Edad est.</div><div id="r_age" class="val">–</div></div>
-          <div><div class="lbl">Peso est.</div><div id="r_w" class="val">–</div></div>
-        </div>
-        <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:6px">
-          <div>
-            <div style="font-weight:600;margin-bottom:6px">Morfología</div>
-            <div class="stat"><div>Largo/Alzada</div><div id="m_body">–</div></div>
-            <div class="stat"><div>Prof. abdomen/Alzada</div><div id="m_belly">–</div></div>
-            <div class="stat"><div>Ángulo corvejón (°)</div><div id="m_hock">–</div></div>
-            <div class="stat"><div>Desv. de dorso</div><div id="m_top">–</div></div>
-            <div class="stat"><div>Pendiente de grupa</div><div id="m_rump">–</div></div>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:6px">Condición y salud</div>
-            <div class="stat"><div>BCS (1–5)</div><div id="r_bcs">–</div></div>
-            <div style="margin:6px 0;color:var(--muted)">Precaución principal</div>
-            <div id="mainCaution" class="badge warn" style="display:none"></div>
-            <div style="margin:6px 0;color:var(--muted)">Otras precauciones</div>
-            <ul id="flags" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:6px">Aptitud para engorda</div>
-            <div class="bar"><i id="scoreBar"></i></div>
-            <div style="font-size:12px;color:var(--muted);margin-top:6px">Score: <span id="scoreNum">–</span>/100</div>
-            <div style="margin-top:6px">Veredicto: <span id="verdict" class="badge">–</span></div>
-            <div style="margin-top:8px;font-size:12px;color:var(--muted)">Raza/tipo: <span id="breedTop" style="color:#e5e7eb">–</span></div>
-          </div>
-        </div>
-        <div style="font-weight:600;margin-top:8px;margin-bottom:6px">Resumen razonado</div>
-        <div id="r_text" style="color:var(--muted)">—</div>
-      </div>
-
-      <div id="finance" class="card" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-weight:700">Finanzas · Rango recomendado</div>
-          <div class="pill" id="fi_sample">Muestra: –</div>
-        </div>
-        <div class="grid" style="grid-template-columns:2fr 1fr;gap:12px">
-          <div>
-            <div class="kpi">
-              <div><div class="lbl">CRC/kg P25</div><div id="fi_p25" class="val">–</div></div>
-              <div><div class="lbl">CRC/kg P50</div><div id="fi_p50" class="val">–</div></div>
-              <div><div class="lbl">CRC/kg P75</div><div id="fi_p75" class="val">–</div></div>
-              <div><div class="lbl">Peso usado (kg)</div><div id="fi_w" class="val">–</div></div>
-            </div>
-            <div class="stat"><div>Total conservador</div><div id="fi_conservative">–</div></div>
-            <div class="stat"><div>Total medio</div><div id="fi_mid">–</div></div>
-            <div class="stat"><div>Total alto</div><div id="fi_high">–</div></div>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:6px">Decisión</div>
-            <div id="fi_decision" class="badge">–</div>
-            <div id="fi_note" style="margin-top:6px;color:var(--muted)">Carga datos de subastas para precisión.</div>
-            <div class="grid" style="margin-top:10px">
-              <label class="btn ghost" for="fi_csv">Subir CSV</label>
-              <input id="fi_csv" type="file" accept=".csv,text/csv" style="display:none">
-              <label class="btn ghost" for="fi_imgs">Subir imágenes (resúmenes de subasta)</label>
-              <input id="fi_imgs" type="file" accept="image/*" multiple style="display:none">
-              <button id="fi_clear" class="btn ghost" type="button">Borrar dataset</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <aside class="grid">
-      <div id="buyCard" class="card">
-        <div style="font-weight:700;margin-bottom:6px">Rango para comprar (recomendado)</div>
-        <div class="kpi">
-          <div><div class="lbl">Decisión</div><div id="buy_dec" class="badge">–</div></div>
-          <div><div class="lbl">Rango recomendado</div><div id="buy_rng" class="val">–</div></div>
-        </div>
-        <div class="stat"><div>CRC/kg P25</div><div id="buy_p25">–</div></div>
-        <div class="stat"><div>CRC/kg P50</div><div id="buy_p50">–</div></div>
-        <div class="stat"><div>CRC/kg P75</div><div id="buy_p75">–</div></div>
-        <div class="pill" id="buy_note">Carga datos de subasta para precisión.</div>
-      </div>
-      <div class="card">
-        <div style="font-weight:700;margin-bottom:6px">Criterios de “No comprar”</div>
-        <ul style="color:var(--muted);margin:0 0 0 18px;list-style:disc">
-          <li>BCS &lt; 2.2 → Muy malo</li>
-          <li>BCS 2.2–2.6 → como máximo Malo</li>
-          <li>Emaciación/cojera/enf. visible → cap veredicto</li>
-          <li>Toro &gt; 30 meses → máx Regular</li>
-        </ul>
-      </div>
-    </aside>
-  </div>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>GanadoPro • v32</title>
+<style>:root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#e5e7eb}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}.pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:#9ca3af;background:#0b1325}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}.grid{display:grid;gap:12px}
+.card{background:#0f172a;border:1px solid #1f2937;border-radius:16px;padding:14px}.btn{background:#e5e7eb;color:#0b1220;border:none;border-radius:10px;padding:10px 14px;cursor:pointer}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid #1f2937;background:#0b1325;font-size:12px;color:#cbd5e1}
+.ok{background:rgba(16,185,129,.15);border-color:#065f46;color:#a7f3d0}.warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}.bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
+.bar{height:12px;background:#111827;border-radius:999px;overflow:hidden}.bar>i{display:block;height:12px;width:0;background:#ef4444;border-radius:999px}
+.preview{max-width:100%;border-radius:12px;border:1px solid #1f2937}</style>
+<script>(function(){function byId(id){return document.getElementById(id)}function getApi(){try{return localStorage.getItem('ganadopro.apiBase')||'/api'}catch(e){return'/api'}}
+function saveApi(v){try{localStorage.setItem('ganadopro.apiBase',v)}catch(e){}}
+function setBadge(text,ok){var el=byId('health');if(!el)return;el.textContent=text;el.style.color=ok?'#86efac':'#fecaca'}
+async function health(){var base=getApi();var url=(base||'/api').replace(/\/$/,'')+'/health';try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),3500);const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);const j=await r.json();setBadge(j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave',j.hasKey);byId('health').href=url}catch(e){setBadge('API: error',false);byId('health').href=url}}
+window.addEventListener('DOMContentLoaded',function(){var cfg=byId('cfgApi');if(cfg){cfg.onclick=function(){var cur=getApi();var val=prompt('Base de API (ej: /api o https://tuapp.vercel.app/api)',cur);if(!val)return;saveApi(val);health();alert('API base guardada: '+val)}};var rst=byId('resetApi');if(rst){rst.onclick=function(){saveApi('/api');alert('API base restablecida a /api');health();}};var file=byId('file');var btn=byId('btnUpload');var lbl=byId('lblUpload');if(btn&&file)btn.onclick=function(){file.click()};if(lbl&&file)lbl.onclick=function(){file.click()};health();});})();</script>
+</head><body><div class="wrap">
+<header style="display:flex;align-items:center;gap:8px"><div style="font-weight:800;font-size:20px">GanadoPro • v32</div>
+<div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+<a class="pill" id="health" href="#">API: verificando…</a><button id="cfgApi" class="pill" type="button">Configurar API</button><button id="resetApi" class="pill" type="button">Reset API</button>
+</div></header>
+<div class="row"><div class="grid">
+<div class="card" id="dropArea"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<label for="file" class="btn" id="lblUpload">Subir imagen</label><button id="btnUpload" class="btn" type="button">Elegir</button>
+<input id="file" type="file" accept="image/*" style="display:none">
+<input id="fileNative" type="file" accept="image/*" style="background:#0b1325;color:#e5e7eb;border:1px solid #1f2937;border-radius:8px;padding:8px">
+<button id="btnReset" class="btn" type="button">Reset</button><div id="status" class="pill">Listo para cargar</div></div>
+<div id="imgWrap" style="margin-top:10px;display:none"><img id="preview" class="preview" alt="preview"></div></div>
+<div id="report" class="card" style="display:none">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700">Informe técnico</div><div id="src" style="font-size:12px;color:#9ca3af"></div></div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+<div><div class="stat"><div>Largo/Alzada</div><div id="m_body">–</div></div><div class="stat"><div>Prof. abdomen/Alzada</div><div id="m_belly">–</div></div><div class="stat"><div>Ángulo corvejón (°)</div><div id="m_hock">–</div></div><div class="stat"><div>Desv. de dorso</div><div id="m_top">–</div></div><div class="stat"><div>Pendiente de grupa</div><div id="m_rump">–</div></div></div>
+<div><div class="stat"><div>BCS (1–5)</div><div id="r_bcs">–</div></div><div style="margin:6px 0;color:#9ca3af">Precaución principal</div><div id="mainCaution" class="badge warn" style="display:none"></div><div style="margin:6px 0;color:#9ca3af">Otras precauciones</div><ul id="flags" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul></div>
+<div><div class="bar"><i id="scoreBar"></i></div><div style="font-size:12px;color:#9ca3af;margin-top:6px">Score: <span id="scoreNum">–</span>/100</div><div style="margin-top:6px">Veredicto: <span id="verdict" class="badge">–</span></div><div style="margin-top:8px;font-size:12px;color:#9ca3af">Raza/tipo: <span id="breedTop" style="color:#e5e7eb">–</span></div></div>
 </div>
-
-<script>
-(function(){
-  const $=(s)=>document.querySelector(s);
-  const nf=new Intl.NumberFormat('es-CR');
-  const state={ apiBase: localStorage.getItem('ganadopro.apiBase') || '/api' };
-  const status=$('#status'); const preview=$('#preview'); const imgWrap=$('#imgWrap');
-  const fileHidden=$('#file'); const fileNative=$('#fileNative');
-  const diag=$('#diag'); function log(msg){ if(!diag) return; diag.textContent += (diag.textContent? '\\n':'') + msg; }
-
-  async function fileToDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
-  async function compress(file, maxSide=1400, quality=0.8){
-    const dataUrl=await fileToDataURL(file);
-    const img=new Image(); img.src=dataUrl;
-    await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error('No se pudo decodificar imagen')); });
-    const scale=Math.min(1, maxSide/Math.max(img.naturalWidth, img.naturalHeight));
-    const w=Math.round(img.naturalWidth*scale), h=Math.round(img.naturalHeight*scale);
-    const c=document.createElement('canvas'); c.width=w; c.height=h;
-    c.getContext('2d', {alpha:false, desynchronized:true}).drawImage(img,0,0,w,h);
-    const out=c.toDataURL('image/jpeg', quality);
-    const b64len=out.length-'data:image/jpeg;base64,'.length; const size=Math.floor(b64len*3/4);
-    return { dataUrl:out, bytes:size };
-  }
-
-  function gaugeColor(score){ if(score<45) return '#ef4444'; if(score<58) return '#f59e0b'; if(score<72) return '#eab308'; if(score<90) return '#10b981'; return '#22c55e'; }
-  function flagToEs(f){ const d={ 'hock_angle_closed':'Corvejón cerrado: vigilar', 'hock_angle_watch':'Ángulo de corvejón subóptimo', 'topline_curved':'Dorso curvado', 'steep_rump':'Grupa muy caída', 'underweight':'Condición corporal baja' }; return d[f]||f.replaceAll('_',' '); }
-  function badgeClass(v){ if(v==='Excelente'||v==='Bueno') return 'badge ok'; if(v==='Regular') return 'badge warn'; return 'badge bad'; }
-
-  const DS_KEY='ganadopro.fin.rows';
-  function loadRows(){ try{ return JSON.parse(localStorage.getItem(DS_KEY)||'[]'); }catch{ return []; } }
-  function saveRows(rows){ try{ localStorage.setItem(DS_KEY, JSON.stringify(rows)); }catch{} }
-  function parseCSVFinance(text){
-    const lines=text.split(/\\r?\\n/).filter(l=>l.trim()); if(!lines.length) return [];
-    const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
-    const idxCat=headers.indexOf('category')>-1? headers.indexOf('category') : headers.indexOf('tipo');
-    const idxAvg=headers.indexOf('price_per_kg')>-1? headers.indexOf('price_per_kg') : headers.indexOf('precio_promedio_por_kilo');
-    const out=[]; for(const line of lines.slice(1)){ const cells=line.split(','); const cat=(cells[idxCat]||'').toLowerCase(); const v=Number(String(cells[idxAvg]||'').replace(/[^0-9.\\-]/g,'')); if(!Number.isFinite(v)) continue; out.push({ category:cat, perKgAvg:v }); } return out;
-  }
-  function pct(arr,p){ const i=Math.max(0, Math.min(arr.length-1, Math.round((p/100)*(arr.length-1)))); return arr[i]; }
-  function quartiles(rows,cat){ const map={ 'toros':'toro','toro':'toro','novillo':'novillo','novillos':'novillo','ternero':'ternero','terneros':'ternero','vaquilla':'vaquilla','vaca':'vaca','repasto':'repasto','macho criollo':'macho_criollo','novilla':'novilla','ternera':'ternera','búfalo':'búfalo','bufalo':'búfalo' }; const target=(map[cat?.toLowerCase?.()]||cat||'').toLowerCase(); let filtered=rows.filter(r=>(map[r.category]||r.category)===target); if(filtered.length<3) filtered=rows.filter(r=>Number.isFinite(r.perKgAvg)); const vals=filtered.map(r=>r.perKgAvg).filter(Number.isFinite).sort((a,b)=>a-b); if(vals.length<3) return null; return { p25:pct(vals,25), p50:pct(vals,50), p75:pct(vals,75), n:vals.length }; }
-  function decisionPolicy(verdict,q,weight){ if(!Number.isFinite(weight)) return {label:'Sin datos', totals:null, note:'Falta peso estimado'}; if(!q) { let label='Sin datos', note='Agrega CSV/Imágenes de subasta para ver precios.'; if(verdict==='Muy malo'||verdict==='Malo'){ label='NO COMPRAR'; note='Basado en morfología (sin precios).'; } else if(verdict==='Regular'){ label='Conservador'; note='Sin precios: negociar bajo.'; } else if(verdict==='Bueno'){ label='Vale la pena'; note='Sin precios: usar referencia local.'; } else if(verdict==='Excelente'){ label='Premium'; note='Sin precios: admite premium si el lote lo amerita.'; } return {label, totals:null, note}; } const low=q.p25*weight, mid=q.p50*weight, high=q.p75*weight; let dec=''; let recLow=low, recHigh=high, note=''; if(verdict==='Muy malo'||verdict==='Malo'){ dec='NO COMPRAR'; recLow=0; recHigh=Math.round(low*0.85); note='Estructura/condición deficiente.'; } else if(verdict==='Regular'){ dec='Conservador'; recLow=low; recHigh=mid; note='Comprar solo en rango bajo–medio.'; } else if(verdict==='Bueno'){ dec='Vale la pena'; recLow=mid; recHigh=Math.round(high*1.05); note='Buen biotipo: hasta ~5% sobre P75.'; } else { dec='Premium'; recLow=mid; recHigh=Math.round(high*1.15); note='Excelente: admite premium sobre P75.'; } return {label:dec, totals:{low,mid,high,recLow,recHigh}, note}; }
-
-  function updateAside(dec,q,weight){ const b=$('#buy_dec'); b.textContent=dec.label; b.className='badge '+(dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok'); const rng=$('#buy_rng'); if(dec.totals&&Number.isFinite(dec.totals.recLow)&&Number.isFinite(dec.totals.recHigh)){ rng.textContent=nf.format(dec.totals.recLow)+' – '+nf.format(dec.totals.recHigh);} else rng.textContent='—'; $('#buy_p25').textContent=q?nf.format(q.p25):'–'; $('#buy_p50').textContent=q?nf.format(q.p50):'–'; $('#buy_p75').textContent=q?nf.format(q.p75):'–'; $('#buy_note').textContent=dec.note + (Number.isFinite(weight)? ' · peso '+nf.format(weight)+' kg':'' ); }
-
-  function refreshFinancePanel(r){
-    const rows=loadRows(); const cat=r?.categoryGuess||'novillo'; const weight=Number(r?.weightGuessKg)||NaN; const q=quartiles(rows,cat);
-    const panel=$('#finance'); panel.style.display='block';
-    $('#fi_w').textContent=Number.isFinite(weight)? nf.format(weight) : '–';
-    if(!q){ $('#fi_p25').textContent='–'; $('#fi_p50').textContent='–'; $('#fi_p75').textContent='–'; $('#fi_sample').textContent='Muestra: 0'; const dec=decisionPolicy(r?.verdictBand,null,weight); const b=$('#fi_decision'); b.textContent=dec.label; b.className='badge '+(dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok'); $('#fi_note').textContent=dec.note; $('#fi_conservative').textContent='–'; $('#fi_mid').textContent='–'; $('#fi_high').textContent='–'; updateAside(dec,null,weight); return; }
-    $('#fi_p25').textContent=nf.format(q.p25); $('#fi_p50').textContent=nf.format(q.p50); $('#fi_p75').textContent=nf.format(q.p75); $('#fi_sample').textContent='Muestra: '+q.n+' ('+cat+')';
-    const dec=decisionPolicy(r?.verdictBand,q,weight); const b=$('#fi_decision'); b.textContent=dec.label; b.className='badge '+(dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok'); $('#fi_note').textContent=dec.note; $('#fi_conservative').textContent=nf.format(dec.totals.low); $('#fi_mid').textContent=nf.format(dec.totals.mid); $('#fi_high').textContent=nf.format(dec.totals.high)+' (máx '+nf.format(dec.totals.recHigh)+')'; updateAside(dec,q,weight);
-  }
-
-  function summarize(r){ const m=r.morphology||{}; const bcs=Number(r.bcs)||NaN; const bits=[]; if(Number.isFinite(bcs)){ if(bcs<2.3) bits.push('condición baja (BCS '+bcs.toFixed(1)+')'); else if(bcs>3.8) bits.push('condición alta (BCS '+bcs.toFixed(1)+')'); else bits.push('BCS adecuado ('+bcs.toFixed(1)+')'); } if(Number.isFinite(m.hockAngleDeg)){ if(m.hockAngleDeg<135) bits.push('corvejón cerrado'); else if(m.hockAngleDeg>155) bits.push('corvejón abierto'); else bits.push('corvejón aceptable (~'+Math.round(m.hockAngleDeg)+'°)'); } if(Number.isFinite(m.bodyLenToHeight)){ if(m.bodyLenToHeight>=1.55) bits.push('buen largo corporal'); } if(Number.isFinite(m.toplineDeviation)){ if(m.toplineDeviation>0.12) bits.push('dorso curvado'); else bits.push('línea superior adecuada'); } if(Array.isArray(r.healthFlags)&&r.healthFlags.length){ bits.push('precauciones: '+r.healthFlags.map(flagToEs).join(', ')); } const sex=r.sex||'desconocido', cat=r.categoryGuess||'sin categoría'; return `Animal ${sex} (${cat}). ${bits.join('; ')}.`; }
-
-  async function analyze(file){
-    try{
-      status.textContent='Procesando imagen…';
-      const comp = await compress(file, 1400, 0.8);
-      status.textContent='Analizando ('+ ( (file.size/1024/1024).toFixed(2) ) +' MB → ~'+ ( (comp.bytes/1024/1024).toFixed(2) ) +' MB)…';
-
-      const resp = await fetch((state.apiBase||'/api').replace(/\/$/,'')+'/analyze',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ imageDataUrl: comp.dataUrl })});
-      if(!resp.ok){ const txt=await resp.text(); throw new Error('API '+resp.status+': '+txt.slice(0,160)); }
-      const r = await resp.json();
-
-      // --- PINTAR INFORME ---
-      $('#report').style.display='block';
-      $('#src').textContent = 'Fuente: ' + (r.source==='heuristic'?'heurística':'IA OpenAI') + (r.note? ' — '+r.note : '');
-      $('#r_sex').textContent=r.sex||'–'; $('#r_cat').textContent=r.categoryGuess||'–'; $('#r_age').textContent=Number.isFinite(r.ageGuessMonths)? (r.ageGuessMonths+' meses'):'–'; $('#r_w').textContent=Number.isFinite(r.weightGuessKg)? nf.format(r.weightGuessKg)+' kg':'–';
-      $('#m_body').textContent=(r.morphology&&Number.isFinite(r.morphology.bodyLenToHeight))? r.morphology.bodyLenToHeight.toFixed(2):'–';
-      $('#m_belly').textContent=(r.morphology&&Number.isFinite(r.morphology.bellyDepthRatio))? r.morphology.bellyDepthRatio.toFixed(2):'–';
-      $('#m_hock').textContent=(r.morphology&&Number.isFinite(r.morphology.hockAngleDeg))? r.morphology.hockAngleDeg.toFixed(0):'–';
-      $('#m_top').textContent=(r.morphology&&Number.isFinite(r.morphology.toplineDeviation))? r.morphology.toplineDeviation.toFixed(2):'–';
-      $('#m_rump').textContent=(r.morphology&&Number.isFinite(r.morphology.rumpSlope))? r.morphology.rumpSlope.toFixed(2):'–';
-      $('#r_bcs').textContent=Number.isFinite(r.bcs)? r.bcs.toFixed(1):'–';
-      $('#breedTop').textContent=(r.breedGuess && r.breedGuess[0]?.breed) ? r.breedGuess[0].breed : '–';
-      const sc=Number.isFinite(r.score)? r.score : 0; $('#scoreNum').textContent=sc; $('#scoreBar').style.width=sc+'%'; $('#scoreBar').style.background=gaugeColor(sc);
-      const vb=r.verdictBand||'–'; const vEl=$('#verdict'); vEl.textContent=vb; vEl.className=badgeClass(vb);
-      const flags=Array.isArray(r.healthFlags)? r.healthFlags:[]; const ul=$('#flags'); ul.innerHTML=''; const main=$('#mainCaution'); if(flags.length===0){ main.style.display='none'; const li=document.createElement('li'); li.style.color='var(--muted)'; li.textContent='Sin observaciones'; ul.appendChild(li); } else { const order=['underweight','hock_angle_closed','topline_curved','steep_rump','hock_angle_watch']; const sorted=[...flags].sort((a,b)=> order.indexOf(a)-order.indexOf(b)); main.style.display='inline-flex'; main.textContent=flagToEs(sorted[0]); sorted.slice(1).forEach(t=>{ const li=document.createElement('li'); li.textContent=flagToEs(t); ul.appendChild(li); }); }
-      $('#r_text').innerHTML = (Array.isArray(r.verdictReasons)&&r.verdictReasons.length)? ('• '+r.verdictReasons.join('<br>• ')) : summarize(r);
-      refreshFinancePanel(r);
-
-      status.textContent='Listo';
-    }catch(err){
-      status.textContent='Error: '+(err&&err.message?err.message:err);
-      const d=document.getElementById('diag'); if(d){ d.textContent += (d.textContent? '\\n':'') + 'Error: '+(err&&err.message?err.message:err); }
-    }
-  }
-
-  function startWithFile(f){
-    if(!f){ status.textContent='No seleccionaste imagen'; return; }
-    if(!/^image\//i.test(f.type)){ status.textContent='Archivo no es imagen'; return; }
-    const url=URL.createObjectURL(f); imgWrap.style.display='block'; preview.src=url; requestAnimationFrame(()=> URL.revokeObjectURL(url));
-    status.textContent='Imagen seleccionada: '+(f.name||'(captura)');
-    analyze(f);
-  }
-
-  // Inputs + eventos
-  document.getElementById('btnReset').onclick = ()=>{ preview.src=''; imgWrap.style.display='none'; document.getElementById('report').style.display='none'; document.getElementById('finance').style.display='none'; status.textContent='Listo para cargar (puedes pegar o arrastrar imagen)'; };
-  fileHidden.addEventListener('change', (e)=> startWithFile(e.target.files && e.target.files[0]));
-  fileNative.addEventListener('change', (e)=> startWithFile(e.target.files && e.target.files[0]));
-  window.addEventListener('paste', (e)=>{ const items=e.clipboardData?.items||[]; for(const it of items){ if(it.type && it.type.startsWith('image/')){ const f=it.getAsFile(); if(f) { startWithFile(f); break; } } } });
-})();</script>
-</body>
-</html>
+<div style="font-weight:600;margin-top:8px;margin-bottom:6px">Resumen IA (explicación)</div><div id="r_text" style="color:#d1d5db">—</div>
+</div>
+<div id="finance" class="card" style="display:none"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700">Finanzas · Rango recomendado</div><div class="pill" id="fi_sample">Muestra: –</div></div>
+<div class="grid" style="grid-template-columns:2fr 1fr;gap:12px">
+<div><div class="stat"><div>Total conservador</div><div id="fi_conservative">–</div></div><div class="stat"><div>Total medio</div><div id="fi_mid">–</div></div><div class="stat"><div>Total alto</div><div id="fi_high">–</div></div></div>
+<div><div style="font-weight:600;margin-bottom:6px">Decisión</div><div id="fi_decision" class="badge">–</div><div id="fi_note" style="margin-top:6px;color:#9ca3af">Carga datos de subastas para precisión.</div></div>
+</div></div>
+</div>
+<aside class="grid">
+<div id="buyCard" class="card"><div style="font-weight:700;margin-bottom:6px">Rango para comprar (recomendado)</div>
+<div class="stat"><div>Rango</div><div id="buy_rng">–</div></div><div class="stat"><div>Decisión</div><div id="buy_dec" class="badge">–</div></div><div class="pill" id="buy_note">—</div></div>
+</aside>
+</div></div>
+<script>(function(){const $=(s)=>document.querySelector(s);const nf=new Intl.NumberFormat('es-CR');const state={apiBase:localStorage.getItem('ganadopro.apiBase')||'/api'};const status=$('#status');const preview=$('#preview');const imgWrap=$('#imgWrap');const fileHidden=$('#file');const fileNative=$('#fileNative');
+async function fileToDataURL(file){return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});}
+async function compress(file,maxSide=1400,quality=0.8){const dataUrl=await fileToDataURL(file);const img=new Image();img.src=dataUrl;await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('No se pudo decodificar imagen'))});const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));const w=Math.round(img.naturalWidth*scale),h=Math.round(img.naturalHeight*scale);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(img,0,0,w,h);const out=c.toDataURL('image/jpeg',quality);const b64len=out.length-'data:image/jpeg;base64,'.length;const size=Math.floor(b64len*3/4);return{dataUrl:out,bytes:size};}
+function gaugeColor(s){if(s<45)return'#ef4444';if(s<58)return'#f59e0b';if(s<72)return'#eab308';if(s<90)return'#10b981';return'#22c55e'}
+function badgeClass(v){if(v==='Excelente'||v==='Bueno')return'badge ok';if(v==='Regular')return'badge warn';return'badge bad'}
+function summarize(r){const m=r.morphology||{};const bcs=Number(r.bcs)||NaN;const parts=[];if(Number.isFinite(bcs)){if(bcs<2.3)parts.push('condición baja (BCS '+bcs.toFixed(1)+')');else if(bcs>3.8)parts.push('condición alta (BCS '+bcs.toFixed(1)+')');else parts.push('BCS adecuado ('+bcs.toFixed(1)+')');}if(Number.isFinite(m.bodyLenToHeight))parts.push('largo/alzada '+m.bodyLenToHeight.toFixed(2));if(Number.isFinite(m.hockAngleDeg))parts.push('corvejón ~'+Math.round(m.hockAngleDeg)+'°');if(Number.isFinite(m.toplineDeviation))parts.push('desv. dorso '+m.toplineDeviation.toFixed(2));return'Evaluación automática: '+parts.join(' · ')}
+function decisionPolicy(v,q,w){if(!Number.isFinite(w))return{label:'Sin datos',note:'Falta peso',rng:null};if(!q){if(v==='Muy malo'||v==='Malo')return{label:'NO COMPRAR',note:'Morfología/BCS',rng:null};if(v==='Regular')return{label:'Conservador',note:'Sólo bajo',rng:null};if(v==='Bueno')return{label:'Vale la pena',note:'Un poco sobre promedio',rng:null};if(v==='Excelente')return{label:'Premium',note:'Margen alto',rng:null};return{label:'Sin datos',note:'Carga precios',rng:null}}const low=q.p25*w,mid=q.p50*w,high=q.p75*w;if(v==='Muy malo'||v==='Malo')return{label:'NO COMPRAR',note:'No recomendado',rng:null};if(v==='Regular')return{label:'Conservador',note:'P25–P50',rng:[low,mid]};if(v==='Bueno')return{label:'Vale la pena',note:'hasta ~+6% sobre P75',rng:[mid,Math.round(high*1.06)]};return{label:'Premium',note:'hasta ~+12% sobre P75',rng:[mid,Math.round(high*1.12)]}}
+function quartiles(rows){if(!rows||!rows.length)return null;const vals=rows.map(r=>r.perKgAvg).filter(Number.isFinite).sort((a,b)=>a-b);if(vals.length<3)return null;const pct=(arr,p)=>{const i=Math.max(0,Math.min(arr.length-1,Math.round((p/100)*(arr.length-1))));return arr[i]};return{p25:pct(vals,25),p50:pct(vals,50),p75:pct(vals,75),n:vals.length}}
+async function analyze(file){try{status.textContent='Procesando imagen…';const comp=await compress(file,1400,0.8);status.textContent='Analizando…';const resp=await fetch((state.apiBase||'/api').replace(/\/$,'')+'/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageDataUrl:comp.dataUrl})});if(!resp.ok){const txt=await resp.text();throw new Error('API '+resp.status+': '+txt.slice(0,160))}const r=await resp.json();document.getElementById('report').style.display='block';document.getElementById('src').textContent='Fuente: '+(r.source==='heuristic'?'heurística':'IA OpenAI');document.getElementById('m_body').textContent=r.morphology?.bodyLenToHeight?.toFixed?.(2)||'–';document.getElementById('m_belly').textContent=r.morphology?.bellyDepthRatio?.toFixed?.(2)||'–';document.getElementById('m_hock').textContent=r.morphology?.hockAngleDeg?.toFixed?.(0)||'–';document.getElementById('m_top').textContent=r.morphology?.toplineDeviation?.toFixed?.(2)||'–';document.getElementById('m_rump').textContent=r.morphology?.rumpSlope?.toFixed?.(2)||'–';document.getElementById('r_bcs').textContent=(Number.isFinite(r.bcs)?r.bcs.toFixed(1):'–');document.getElementById('breedTop').textContent=(r.breedGuess&&r.breedGuess[0]?.breed)||'–';const sc=Number.isFinite(r.score)?r.score:0;document.getElementById('scoreNum').textContent=sc;const bar=document.getElementById('scoreBar');bar.style.width=sc+'%';bar.style.background=gaugeColor(sc);const v=r.verdictBand||'–';const vEl=document.getElementById('verdict');vEl.textContent=v;vEl.className=badgeClass(v);document.getElementById('r_text').textContent=r.explanation||' '+summarize(r);document.getElementById('finance').style.display='block';const rows=JSON.parse(localStorage.getItem('ganadopro.fin.rows')||'[]');const q=quartiles(rows);const weight=Number(r.weightGuessKg)||NaN;const dec=decisionPolicy(v,q,weight);document.getElementById('buy_dec').textContent=dec.label;document.getElementById('buy_dec').className=badgeClass(dec.label==='Conservador'?'Regular':dec.label);document.getElementById('buy_rng').textContent=dec.rng? (new Intl.NumberFormat('es-CR')).format(dec.rng[0])+' – '+(new Intl.NumberFormat('es-CR')).format(dec.rng[1]) : '—';document.getElementById('buy_note').textContent=dec.note;document.getElementById('fi_conservative').textContent=q?nf.format(q.p25*weight):'–';document.getElementById('fi_mid').textContent=q?nf.format(q.p50*weight):'–';document.getElementById('fi_high').textContent=q?nf.format(q.p75*weight):'–';status.textContent='Listo'}catch(err){status.textContent='Error: '+(err&&err.message?err.message:err)}}
+function startWithFile(f){if(!f){status.textContent='No seleccionaste imagen';return}if(!/^image\//i.test(f.type)){status.textContent='Archivo no es imagen';return}const url=URL.createObjectURL(f);imgWrap.style.display='block';preview.src=url;requestAnimationFrame(()=>URL.revokeObjectURL(url));status.textContent='Imagen seleccionada: '+(f.name||'(captura)');analyze(f)}
+document.getElementById('btnReset').onclick=()=>{preview.src='';imgWrap.style.display='none';document.getElementById('report').style.display='none';document.getElementById('finance').style.display='none';status.textContent='Listo para cargar'};fileHidden.addEventListener('change',(e)=>startWithFile(e.target.files&&e.target.files[0]));fileNative.addEventListener('change',(e)=>startWithFile(e.target.files&&e.target.files[0]));})();</script>
+</body></html>
