@@ -5,11 +5,18 @@ function clamp(n,min,max){ return Math.min(max, Math.max(min,n)); }
 function num(x){ const n=Number(x); return Number.isFinite(n)?n:NaN; }
 function sanitizeMetrics(m){ let bodyLenToHeight=num(m?.bodyLenToHeight); let bellyDepthRatio=num(m?.bellyDepthRatio); let hockAngleDeg=num(m?.hockAngleDeg); let rumpSlope=num(m?.rumpSlope); let toplineDeviation=num(m?.toplineDeviation); if(!Number.isFinite(bodyLenToHeight)) bodyLenToHeight=1.55; bodyLenToHeight=clamp(bodyLenToHeight,1.05,2.3); if(!Number.isFinite(bellyDepthRatio)) bellyDepthRatio=0.58; if(bellyDepthRatio>1 && bellyDepthRatio<=100) bellyDepthRatio/=100; bellyDepthRatio=clamp(bellyDepthRatio,0.25,1.05); if(!Number.isFinite(hockAngleDeg)) hockAngleDeg=145; hockAngleDeg=clamp(hockAngleDeg,110,180); if(Number.isFinite(rumpSlope)){ if(Math.abs(rumpSlope)>1 && Math.abs(rumpSlope)<=40) rumpSlope/=100; } else rumpSlope=0.06; rumpSlope=clamp(rumpSlope,-0.35,0.35); if(Number.isFinite(toplineDeviation)){ if(toplineDeviation>1 && toplineDeviation<=60) toplineDeviation/=100; } else toplineDeviation=0.06; toplineDeviation=clamp(toplineDeviation,0,0.6); return { bodyLenToHeight, bellyDepthRatio, hockAngleDeg, rumpSlope, toplineDeviation }; }
 function estimateBCS({bellyDepthRatio,toplineDeviation,rumpSlope}){ let base=3; if(Number.isFinite(bellyDepthRatio)){ if(bellyDepthRatio<0.45) base-=0.9; else if(bellyDepthRatio>0.65) base+=0.7; } if(Number.isFinite(toplineDeviation)){ if(toplineDeviation>0.12) base-=0.6; if(toplineDeviation<0.04) base+=0.2; } if(Number.isFinite(rumpSlope) && rumpSlope>0.12) base-=0.2; return Math.max(1, Math.min(5, Number(base.toFixed(1)))); }
-function flagsFromMetrics({hockAngleDeg,toplineDeviation,rumpSlope},bcs,category,ageMonths){ const flags=[]; // thresholds suavizados y dependientes de edad
+function flagsFromMetrics({hockAngleDeg,toplineDeviation,rumpSlope},bcs,category,ageMonths,posture){ const flags=[]; // thresholds suavizados + verificación de fiabilidad
   const young = (category==='ternero' || category==='novillo') && Number.isFinite(ageMonths) && ageMonths<=18;
   const closedTh = young ? 130 : 132;    // antes 135
   const watchTh  = young ? 140 : 142;    // antes 145
-  if(Number.isFinite(hockAngleDeg)){ if(hockAngleDeg<closedTh) flags.push('hock_angle_closed'); else if(hockAngleDeg<watchTh) flags.push('hock_angle_watch'); }
+  const rotated = posture && Number.isFinite(posture.rotationDeg) && posture.rotationDeg>15;
+  const notSide = posture && typeof posture.view==='string' && !/side|lateral/i.test(posture.view);
+  const occluded = posture && (posture.occlusion===true || posture.truncation===true || posture.blur===true || posture.shadowStrong===true);
+  const reliable = !(rotated||notSide||occluded);
+  if(Number.isFinite(hockAngleDeg)){
+    if(hockAngleDeg<closedTh) flags.push('hock_angle_closed');
+    else if(hockAngleDeg<watchTh && reliable) flags.push('hock_angle_watch');
+  }
   if(Number.isFinite(toplineDeviation) && toplineDeviation>0.12) flags.push('topline_curved');
   if(Number.isFinite(rumpSlope) && rumpSlope>0.15) flags.push('steep_rump');
   if(Number.isFinite(bcs) && bcs<2.2) flags.push('underweight');
@@ -61,7 +68,7 @@ export default async function handler(req,res){
     const ageGuessMonths= num(out1.ageGuessMonths); const weightGuessKg=num(out1.weightGuessKg);
     const posture = out1.posture || null;
     const diseaseFindings = Array.isArray(out1.diseaseFindings) ? out1.diseaseFindings.slice(0,10) : [];
-    const healthFlags = flagsFromMetrics(morph,bcs,categoryGuess,ageGuessMonths);
+    const healthFlags = flagsFromMetrics(morph,bcs,categoryGuess,ageGuessMonths,posture);
     const prelimScore = scoreFattening({metrics:morph,bcs,sex,ageMonths:ageGuessMonths,category:categoryGuess});
     let prelimVerdict = bandFromScore(prelimScore);
 
