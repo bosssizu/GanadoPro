@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GanadoPro • v37</title>
+<title>GanadoPro • v39</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -55,8 +55,8 @@ small.dim{color:var(--muted)}
   <header>
     <div class="logo">GP</div>
     <div>
-      <div style="font-weight:800;font-size:20px">GanadoPro • v37</div>
-      <div style="color:var(--muted);font-size:12px">Doble validación IA • “Hard gates” · Mobile-first (sin barra de confianza)</div>
+      <div style="font-weight:800;font-size:20px">GanadoPro • v39</div>
+      <div style="color:var(--muted);font-size:12px">Doble validación IA • “Hard gates” · Mobile-first · Sweet spot BCS=2.8</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <a class="pill" id="health" href="#">API: verificando…</a>
@@ -194,7 +194,7 @@ small.dim{color:var(--muted)}
     const base=PRICE_BASELINES[cat]||null;
     if(!base) return {base:null,min:null,max:null,note:'Sin base histórica para '+cat};
     if(verdict==='Muy malo'||verdict==='Malo') return {base, min:null,max:null,note:'NO COMPRAR (morfología/condición).'};
-    if(verdict==='Regular') return {base, min:Math.round(base.min), max:Math.round(lerp(base.min,base.max,0.5)), note:'Conservador (mitad baja).'};
+    if(verdict==='Regular') return {base, min:Math.round(lerp(base.min,base.max,0.45)), max:Math.round(lerp(base.min,base.max,0.65)), note:'Conservador (45–65% del rango).'};
     if(verdict==='Bueno') return {base, min:Math.round(lerp(base.min,base.max,0.55)), max:Math.round(lerp(base.min,base.max,0.9)), note:'Parte alta, sin tope.'};
     return {base, min:Math.round(lerp(base.min,base.max,0.7)), max:Math.round(base.max*1.08), note:'Premium (tope + ~8%).'};
   }

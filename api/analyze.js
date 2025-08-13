@@ -21,10 +21,21 @@ function flagsFromMetrics({hockAngleDeg,toplineDeviation,rumpSlope},bcs,category
   if(Number.isFinite(rumpSlope) && rumpSlope>0.15) flags.push('steep_rump');
   if(Number.isFinite(bcs) && bcs<2.2) flags.push('underweight');
   return flags; }
-function scoreFattening({metrics,bcs,sex,ageMonths,category}){ let score=0,totalW=0; if(Number.isFinite(bcs)){ const dist=Math.abs(bcs-3.0); let s=100-clamp(dist*50,0,100); const w=0.34; score+=s*w; totalW+=w; } if(Number.isFinite(metrics?.bodyLenToHeight)){ let s=100-Math.abs(metrics.bodyLenToHeight-1.65)*200; s=clamp(s,0,100); const w=0.18; score+=s*w; totalW+=w; } if(Number.isFinite(metrics?.hockAngleDeg)){ let s=100-Math.abs(metrics.hockAngleDeg-145)*6; s=clamp(s,0,100); const w=0.18; score+=s*w; totalW+=w; } if(Number.isFinite(metrics?.toplineDeviation)){ let s=100-clamp((metrics.toplineDeviation-0.08),0,0.5)*(100/0.5); s=clamp(s,0,100); const w=0.16; score+=s*w; totalW+=w; } if(Number.isFinite(metrics?.rumpSlope)){ let x=Math.abs(metrics.rumpSlope); let s=100-clamp(Math.max(0,x-0.12),0,0.35)*(100/0.35); s=clamp(s,0,100); const w=0.08; score+=s*w; totalW+=w; } if(Number.isFinite(ageMonths)){ let adj=1; if(category==='novillo'){ if(ageMonths<8||ageMonths>30) adj=0.9; } else if(category==='ternero'){ adj=0.87; } else if(category==='vaquilla'||category==='vaca_descarte'){ adj=0.88; } else if(category==='toro'){ adj=0.82; } const w=0.06; score+=100*adj*w; totalW+=w; } return clamp(Math.round(score/totalW),0,100); }
+function scoreFattening({metrics,bcs,sex,ageMonths,category}){ let score=0,totalW=0;
+  if(Number.isFinite(bcs)){ const target=2.8; const dist=Math.abs(bcs-target); let s=100-clamp(dist*60,0,100); const w=0.34; score+=s*w; totalW+=w; }
+  if(Number.isFinite(metrics?.bodyLenToHeight)){ let s=100-Math.abs(metrics.bodyLenToHeight-1.65)*200; s=clamp(s,0,100); const w=0.18; score+=s*w; totalW+=w; }
+  if(Number.isFinite(metrics?.hockAngleDeg)){ let s=100-Math.abs(metrics.hockAngleDeg-145)*6; s=clamp(s,0,100); const w=0.18; score+=s*w; totalW+=w; }
+  if(Number.isFinite(metrics?.toplineDeviation)){ let s=100-clamp((metrics.toplineDeviation-0.08),0,0.5)*(100/0.5); s=clamp(s,0,100); const w=0.16; score+=s*w; totalW+=w; }
+  if(Number.isFinite(metrics?.rumpSlope)){ let x=Math.abs(metrics.rumpSlope); let s=100-clamp(Math.max(0,x-0.12),0,0.35)*(100/0.35); s=clamp(s,0,100); const w=0.08; score+=s*w; totalW+=w; }
+  if(Number.isFinite(ageMonths)){ let adj=1; if(category==='novillo'){ if(ageMonths<8||ageMonths>30) adj=0.9; } else if(category==='ternero'){ adj=0.87; } else if(category==='vaquilla'||category==='vaca_descarte'){ adj=0.88; } else if(category==='toro'){ adj=0.82; } const w=0.06; score+=100*adj*w; totalW+=w; }
+  return clamp(Math.round(score/totalW),0,100); }
 const BAND_ORDER=['Muy malo','Malo','Regular','Bueno','Excelente']; function bandFromScore(score){ if(score>=90) return 'Excelente'; if(score>=72) return 'Bueno'; if(score>=58) return 'Regular'; if(score>=45) return 'Malo'; return 'Muy malo'; } function minBand(a,b){ return BAND_ORDER[Math.min(BAND_ORDER.indexOf(a),BAND_ORDER.indexOf(b))]; }
-function guardBand({bcs,emaciation,healthFlags,diseaseFindings,category,sex,ageMonths,posture}){ let cap='Excelente'; if(Number.isFinite(bcs)&&bcs<2.2) cap=minBand(cap,'Muy malo'); else if(Number.isFinite(bcs)&&bcs<2.6) cap=minBand(cap,'Malo'); if(emaciation===true) cap=minBand(cap,'Muy malo'); const risky=['cojera','claudicación','tos','descarga nasal','diarrea','herida','heridas','bloat','timpanismo']; if(Array.isArray(diseaseFindings)&&diseaseFindings.some(x=> typeof x==='string' && risky.some(rx=> x.toLowerCase().includes(rx)))) cap=minBand(cap,'Malo');
-  // hock cerrado ya NO capea a 'Malo'; ahora 'Regular' y solo si la pose permite medir
+function guardBand({bcs,emaciation,healthFlags,diseaseFindings,category,sex,ageMonths,posture}){ let cap='Excelente';
+  if(Number.isFinite(bcs)) { if(bcs<=2.1) cap=minBand(cap,'Muy malo'); else if(bcs<2.4) cap=minBand(cap,'Regular'); else if(bcs>3.8) cap=minBand(cap,'Regular'); }
+  if(emaciation===true) cap=minBand(cap,'Muy malo');
+  const risky=['cojera','claudicación','tos','descarga nasal','diarrea','herida','heridas','bloat','timpanismo'];
+  if(Array.isArray(diseaseFindings)&&diseaseFindings.some(x=> typeof x==='string' && risky.some(rx=> x.toLowerCase().includes(rx)))) cap=minBand(cap,'Malo');
+  // corvejón cerrado solo capea a Regular y solo si la pose es fiable
   const closed = Array.isArray(healthFlags) && healthFlags.includes('hock_angle_closed');
   const rotated = posture && Number.isFinite(posture.rotationDeg) && posture.rotationDeg>20;
   const notSide = posture && typeof posture.view==='string' && !/side|lateral/i.test(posture.view);
@@ -32,7 +43,7 @@ function guardBand({bcs,emaciation,healthFlags,diseaseFindings,category,sex,ageM
   if(category==='toro' && Number.isFinite(ageMonths) && ageMonths>30) cap=minBand(cap,'Regular');
   return cap; }
 function explanationFromHeur(m,bcs,verdict){ const bits=[]; if(Number.isFinite(m?.bodyLenToHeight)) bits.push(`Relación largo/alzada de ${m.bodyLenToHeight.toFixed(2)}.`); if(Number.isFinite(m?.hockAngleDeg)) bits.push(`Ángulo de corvejón ~${Math.round(m.hockAngleDeg)}°.`); if(Number.isFinite(m?.toplineDeviation)) bits.push(`Línea superior (desv. ${m.toplineDeviation.toFixed(2)}).`); if(Number.isFinite(bcs)) bits.push(`BCS ${bcs.toFixed(1)}.`); return `Veredicto ${verdict}. ${bits.join(' ')}`; }
-function heuristic(){ const morphology={bodyLenToHeight:1.55,bellyDepthRatio:0.58,hockAngleDeg:142,rumpSlope:0.07,toplineDeviation:0.06}; const bcs=3.1; const sex='macho',categoryGuess='novillo',ageGuessMonths=14,weightGuessKg=260; const score=74, verdictBand='Bueno'; return {source:'heuristic',morphology,bcs,breedGuess:[{breed:'Brahman / Cebú',pct:40}],healthFlags:flagsFromMetrics(morphology,bcs,'novillo',14),sex,categoryGuess,ageGuessMonths,weightGuessKg,score,verdictBand,auditText:'Pose lateral adecuada. Luz correcta.',auditHardGates:[],explanation:explanationFromHeur(morphology,bcs,verdictBand),auditPass:false}; }
+function heuristic(){ const morphology={bodyLenToHeight:1.55,bellyDepthRatio:0.58,hockAngleDeg:142,rumpSlope:0.07,toplineDeviation:0.06}; const bcs=2.9; const sex='macho',categoryGuess='novillo',ageGuessMonths=14,weightGuessKg=260; const posture={view:'lateral',rotationDeg:5,occlusion:false,blur:false,shadowStrong:false}; const score=76, verdictBand='Bueno'; return {source:'heuristic',morphology,bcs,breedGuess:[{breed:'Brahman / Cebú',pct:40}],healthFlags:flagsFromMetrics(morphology,bcs,'novillo',14,posture),sex,categoryGuess,ageGuessMonths,weightGuessKg,score,verdictBand,auditText:'Pose lateral adecuada. Luz correcta.',auditHardGates:[],explanation:explanationFromHeur(morphology,bcs,verdictBand),auditPass:false}; }
 
 async function openaiJSON(key, model, messages){
   const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${key}`},body:JSON.stringify({model,temperature:0.1,response_format:{type:'json_object'},messages})});
@@ -48,7 +59,7 @@ export default async function handler(req,res){
     const key=process.env.OPENAI_API_KEY; const model=process.env.OPENAI_MODEL||'gpt-4o-mini';
     if(!key) return res.status(200).json(heuristic());
 
-    // PASO 1: extracción numérica + postura
+    // PASO 1: extracción + postura
     const sys1 = "Eres un evaluador de ganado para engorde. Devuelve SOLO JSON con métricos numéricos estrictos dentro de rangos fisiológicos.";
     const user1 = {type:'text', text: "Extrae: morphology{bodyLenToHeight(1.0-2.5), bellyDepthRatio(0.2-1.2), hockAngleDeg(110-180), rumpSlope(-0.4-0.4), toplineDeviation(0.0-0.6)}, bcs(1-5), sex('macho'/'hembra'), categoryGuess('ternero','novillo','toro','vaca','novilla','vaquilla','macho criollo'), ageGuessMonths, weightGuessKg, diseaseFindings[], posture{view, rotationDeg, occlusion, truncation, blur, lighting, shadowStrong}. Devuelve SOLO JSON."};
     let out1;
@@ -100,7 +111,7 @@ export default async function handler(req,res){
     let band = prelimVerdict;
     if(auditCap){ band = minBand(band, auditCap); }
     if(cap1){ band = minBand(band, cap1); }
-    if(auditHardGates.length){ band = minBand(band, 'Malo'); } // solo para gates reales (no hock)
+    if(auditHardGates.length){ band = minBand(band, 'Malo'); } // solo para gates reales
 
     const json = {
       source:'openai',
