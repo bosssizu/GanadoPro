@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GanadoPro • v39.4 (cal)</title>
+<title>GanadoPro • v39.4.1 (safe)</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -55,8 +55,8 @@ small.dim{color:var(--muted)}
   <header>
     <div class="logo">GP</div>
     <div>
-      <div style="font-weight:800;font-size:20px">GanadoPro • v39.4 (cal)</div>
-      <div style="color:var(--muted);font-size:12px">Doble validación IA • Hard gates • Mobile • Anti-defaults • Precios BCS/categoría</div>
+      <div style="font-weight:800;font-size:20px">GanadoPro • v39.4.1 (safe)</div>
+      <div style="color:var(--muted);font-size:12px">Doble validación IA • Anti-defaults • Re-medido hock/topline • Precios BCS</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <a class="pill" id="health" href="#">API: verificando…</a>
@@ -166,7 +166,6 @@ small.dim{color:var(--muted)}
   const status=$('#status'); const preview=$('#preview'); const imgWrap=$('#imgWrap');
   const fileHidden=$('#file'); const diag=$('#diag'); function log(m){ if(!diag) return; diag.textContent+=(diag.textContent?'\\n':'')+m; }
 
-  // === NUEVOS precios base y reglas ===
   const PRICE_BASELINES={
     "ternero":{min:1300,max:1550,src:"2022–2025"},
     "novillo":{min:1400,max:1650,src:"2022–2025"},
@@ -191,7 +190,7 @@ small.dim{color:var(--muted)}
 
   function bcsMultipliers(bcs){
     if(!(Number.isFinite(bcs))) return [0.90,0.98];
-    if(bcs<=2.2) return null;              // no comprar
+    if(bcs<=2.2) return null;
     if(bcs<=2.6) return [0.85,0.92];
     if(bcs<=3.0) return [0.92,1.00];
     if(bcs<=3.4) return [0.90,0.96];
@@ -199,17 +198,9 @@ small.dim{color:var(--muted)}
   }
 
   function dynamicCaps(cat, verdict, ageMonths){
-    // Tope solicitado por el usuario: buen/excelente ternero puede llegar hasta 1800
-    if(cat==='ternero'){
-      return {maxBueno:1800, maxExcelente:1800};
-    }
-    // Toro joven (<=24m) usa novillo
-    if(cat==='novillo' || (cat==='toro' && Number.isFinite(ageMonths) && ageMonths<=24)){
-      return {maxBueno:1750, maxExcelente:1750};
-    }
-    if(cat==='toro'){
-      return {maxBueno:1650, maxExcelente:1650};
-    }
+    if(cat==='ternero'){ return {maxBueno:1800, maxExcelente:1800}; }
+    if(cat==='novillo' || (cat==='toro' && Number.isFinite(ageMonths) && ageMonths<=24)){ return {maxBueno:1750, maxExcelente:1750}; }
+    if(cat==='toro'){ return {maxBueno:1650, maxExcelente:1650}; }
     return {maxBueno:null, maxExcelente:null};
   }
 
@@ -220,33 +211,25 @@ small.dim{color:var(--muted)}
 
   function decideKgRange(verdict,cat,hardGates,bcs,ageMonths){
     if(hardGates && hardGates.length) return {base:null,min:null,max:null,note:'NO COMPRAR (hard gate: '+hardGates[0]+')'};
-
     const youngToro = (cat==='toro' && Number.isFinite(ageMonths) && ageMonths<=24);
     const priceCat = youngToro ? 'novillo' : cat;
-
     const base=PRICE_BASELINES[priceCat]||null;
     if(!base) return {base:null,min:null,max:null,note:'Sin base histórica para '+priceCat};
-
     const mf=bcsMultipliers(bcs);
     if(mf===null) return {base, min:null,max:null,note:'NO COMPRAR (BCS ≤ 2.2)'};
     let [mLow,mHigh]=mf;
-
     let minKg=Math.round(base.min*mLow);
     let maxKg=Math.round(base.max*mHigh);
-
     if(verdict==='Regular'){ minKg=Math.round(minKg*0.97); maxKg=Math.round(maxKg*0.94); }
     else if(verdict==='Bueno'){ maxKg=Math.round(maxKg*1.03); }
     else if(verdict==='Excelente'){ maxKg=Math.round(maxKg*1.08); }
-
     const caps = dynamicCaps(priceCat, verdict, ageMonths);
     if(verdict==='Bueno' && caps.maxBueno) maxKg = Math.min(maxKg, caps.maxBueno);
     if(verdict==='Excelente' && caps.maxExcelente) maxKg = Math.min(maxKg, caps.maxExcelente);
-
     let note = '';
     if(verdict==='Regular') note = 'Conservador (BCS/veredicto).';
     else if(verdict==='Bueno') note = 'Parte alta controlada.';
     else if(verdict==='Excelente') note = 'Premium controlado.';
-
     return {base, min:minKg, max:maxKg, note};
   }
 
