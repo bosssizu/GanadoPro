@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GanadoPro • v36</title>
+<title>GanadoPro • v37</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -55,8 +55,8 @@ small.dim{color:var(--muted)}
   <header>
     <div class="logo">GP</div>
     <div>
-      <div style="font-weight:800;font-size:20px">GanadoPro • v36</div>
-      <div style="color:var(--muted);font-size:12px">Doble validación IA • Confianza • “Hard gates” · Mobile-first</div>
+      <div style="font-weight:800;font-size:20px">GanadoPro • v37</div>
+      <div style="color:var(--muted);font-size:12px">Doble validación IA • “Hard gates” · Mobile-first (sin barra de confianza)</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <a class="pill" id="health" href="#">API: verificando…</a>
@@ -107,12 +107,10 @@ small.dim{color:var(--muted)}
             <ul id="flags" style="margin:0 0 8px 18px;padding:0;list-style:disc"></ul>
           </div>
           <div>
-            <div style="font-weight:600;margin-bottom:6px">Aptitud y confianza</div>
+            <div style="font-weight:600;margin-bottom:6px">Aptitud para engorda</div>
             <div class="bar"><i id="scoreBar"></i></div>
             <div style="font-size:12px;color:var(--muted);margin-top:6px">Score: <span id="scoreNum">–</span>/100</div>
             <div style="margin-top:6px">Veredicto: <span id="verdict" class="badge">–</span></div>
-            <div style="margin-top:10px">Confianza: <span id="confNum">–</span>%</div>
-            <div class="bar"><i id="confBar"></i></div>
             <div style="margin-top:8px;font-size:12px;color:var(--muted)">Raza/tipo: <span id="breedTop" style="color:#e5e7eb">–</span></div>
           </div>
         </div>
@@ -261,7 +259,6 @@ small.dim{color:var(--muted)}
       $('#breedTop').textContent=(r.breedGuess && r.breedGuess[0]?.breed) ? r.breedGuess[0].breed : '–';
       const sc=Number.isFinite(r.score)? r.score : 0; $('#scoreNum').textContent=sc; $('#scoreBar').style.width=sc+'%'; $('#scoreBar').style.background=colorFor(sc);
       const vb=r.verdictBand||'–'; const vEl=$('#verdict'); vEl.textContent=vb; vEl.className=badgeClass(vb);
-      const conf=Math.max(0, Math.min(100, Number(r.confidence)||0)); $('#confNum').textContent=conf.toFixed(0); $('#confBar').style.width=conf+'%'; $('#confBar').style.background=colorFor(conf);
       const flags=Array.isArray(r.healthFlags)? r.healthFlags:[]; const ul=$('#flags'); ul.innerHTML=''; const main=$('#mainCaution'); if(flags.length===0){ main.style.display='none'; const li=document.createElement('li'); li.style.color='var(--muted)'; li.textContent='Sin observaciones'; ul.appendChild(li); } else { const order=['underweight','hock_angle_closed','topline_curved','steep_rump','hock_angle_watch']; const sorted=[...flags].sort((a,b)=> order.indexOf(a)-order.indexOf(b)); main.style.display='inline-flex'; main.textContent=flagToEs(sorted[0]); sorted.slice(1).forEach(t=>{ const li=document.createElement('li'); li.textContent=flagToEs(t); ul.appendChild(li); }); }
       $('#r_text').innerHTML = (r.explanation||r.explanation_es) ? (r.explanation||r.explanation_es) : summarize(r);
       $('#audit_text').textContent = r.auditText || '—';

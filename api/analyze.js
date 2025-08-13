@@ -10,7 +10,7 @@ function scoreFattening({metrics,bcs,sex,ageMonths,category}){ let score=0,total
 const BAND_ORDER=['Muy malo','Malo','Regular','Bueno','Excelente']; function bandFromScore(score){ if(score>=90) return 'Excelente'; if(score>=72) return 'Bueno'; if(score>=58) return 'Regular'; if(score>=45) return 'Malo'; return 'Muy malo'; } function minBand(a,b){ return BAND_ORDER[Math.min(BAND_ORDER.indexOf(a),BAND_ORDER.indexOf(b))]; }
 function guardBand({bcs,emaciation,healthFlags,diseaseFindings,category,sex,ageMonths}){ let cap='Excelente'; if(Number.isFinite(bcs)&&bcs<2.2) cap=minBand(cap,'Muy malo'); else if(Number.isFinite(bcs)&&bcs<2.6) cap=minBand(cap,'Malo'); if(emaciation===true) cap=minBand(cap,'Muy malo'); const risky=['cojera','claudicación','tos','descarga nasal','diarrea','herida','heridas','bloat','timpanismo']; if(Array.isArray(diseaseFindings)&&diseaseFindings.some(x=> typeof x==='string' && risky.some(rx=> x.toLowerCase().includes(rx)))) cap=minBand(cap,'Malo'); if(Array.isArray(healthFlags)&&healthFlags.includes('hock_angle_closed')) cap=minBand(cap,'Malo'); if(category==='toro' && Number.isFinite(ageMonths) && ageMonths>30) cap=minBand(cap,'Regular'); return cap; }
 function explanationFromHeur(m,bcs,verdict){ const bits=[]; if(Number.isFinite(m?.bodyLenToHeight)) bits.push(`Relación largo/alzada de ${m.bodyLenToHeight.toFixed(2)}.`); if(Number.isFinite(m?.hockAngleDeg)) bits.push(`Ángulo de corvejón ~${Math.round(m.hockAngleDeg)}°.`); if(Number.isFinite(m?.toplineDeviation)) bits.push(`Línea superior (desv. ${m.toplineDeviation.toFixed(2)}).`); if(Number.isFinite(bcs)) bits.push(`BCS ${bcs.toFixed(1)}.`); return `Veredicto ${verdict}. ${bits.join(' ')}`; }
-function heuristic(){ const morphology={bodyLenToHeight:1.55,bellyDepthRatio:0.58,hockAngleDeg:142,rumpSlope:0.07,toplineDeviation:0.06}; const bcs=3.1; const sex='macho',categoryGuess='novillo',ageGuessMonths=18,weightGuessKg=320; const score=72, verdictBand='Bueno'; return {source:'heuristic',morphology,bcs,breedGuess:[{breed:'Brahman / Cebú',pct:40}],healthFlags:[],sex,categoryGuess,ageGuessMonths,weightGuessKg,score,verdictBand,confidence:86,auditText:'Pose lateral adecuada. Sin oclusiones. Luz correcta.',auditHardGates:[],explanation:explanationFromHeur(morphology,bcs,verdictBand),auditPass:false}; }
+function heuristic(){ const morphology={bodyLenToHeight:1.55,bellyDepthRatio:0.58,hockAngleDeg:142,rumpSlope:0.07,toplineDeviation:0.06}; const bcs=3.1; const sex='macho',categoryGuess='novillo',ageGuessMonths=18,weightGuessKg=320; const score=72, verdictBand='Bueno'; return {source:'heuristic',morphology,bcs,breedGuess:[{breed:'Brahman / Cebú',pct:40}],healthFlags:[],sex,categoryGuess,ageGuessMonths,weightGuessKg,score,verdictBand,auditText:'Pose lateral adecuada. Sin oclusiones. Luz correcta.',auditHardGates:[],explanation:explanationFromHeur(morphology,bcs,verdictBand),auditPass:false}; }
 
 async function openaiJSON(key, model, messages){
   const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${key}`},body:JSON.stringify({model,temperature:0.1,response_format:{type:'json_object'},messages})});
@@ -25,7 +25,6 @@ export default async function handler(req,res){
     const imageDataUrl=body?.imageDataUrl; if(!imageDataUrl) return res.status(400).json({error:'Missing imageDataUrl'});
     const key=process.env.OPENAI_API_KEY; const model=process.env.OPENAI_MODEL||'gpt-4o-mini';
 
-    // Fallback si no hay llave
     if(!key) return res.status(200).json(heuristic());
 
     // PASO 1: extracción numérica
@@ -41,7 +40,6 @@ export default async function handler(req,res){
       return res.status(200).json(heuristic());
     }
 
-    // Saneado y score preliminar
     const morph = sanitizeMetrics(out1.morphology||{});
     let bcs=num(out1.bcs); if(!Number.isFinite(bcs)||bcs<1||bcs>5) bcs=estimateBCS(morph);
     const sex = out1.sex||'desconocido';
@@ -52,38 +50,33 @@ export default async function handler(req,res){
     const prelimScore = scoreFattening({metrics:morph,bcs,sex,ageMonths:ageGuessMonths,category:categoryGuess});
     let prelimVerdict = bandFromScore(prelimScore);
 
-    // HARD GATES desde paso 1
     const gates = (diseaseFindings||[]).filter(s => typeof s==='string' && HARD_GATES.some(g => s.toLowerCase().includes(g)));
     let cap1 = guardBand({bcs,emaciation: gates.some(x=>x.toLowerCase().includes('emaci')),healthFlags,diseaseFindings,category:categoryGuess,sex,ageMonths:ageGuessMonths});
 
-    // PASO 2: auditoría (usa números)
+    // PASO 2: auditoría (usa números) — sin exponer "confidence" en respuesta
     let auditText='';
-    let confidence=72;
     let auditHardGates=[];
     let auditCap=null;
     try{
       const sys2 = "Eres auditor perito. Revisa consistencia de métricos y calidad de la foto. Devuelve SOLO JSON.";
-      const user2 = `Métricos: ${JSON.stringify({morphology:morph,bcs,sex,categoryGuess,ageGuessMonths,weightGuessKg,diseaseFindings})}. Evalúa: issues[] (texto corto), hard_gates[] (subset: ${HARD_GATES.join(', ')}), consistency_ok (bool), confidence (0-100), explanation_es (2-4 frases con números). Si calidad mala (mucha rotación/oclusiones/luz pobre) disminuye confidence y, si es severo, sugiere cap='Regular'.`;
+      const user2 = `Métricos: ${JSON.stringify({morphology:morph,bcs,sex,categoryGuess,ageGuessMonths,weightGuessKg,diseaseFindings})}. Evalúa: issues[] (texto corto), hard_gates[] (subset: ${HARD_GATES.join(', ')}), consistency_ok (bool), cap (opcional: 'Regular' si calidad mala), explanation_es (2-4 frases).`;
       const out2 = await openaiJSON(key, model, [
         {role:'system', content: sys2},
         {role:'user', content: user2}
       ]);
       auditText = out2.explanation_es || '';
       if(Array.isArray(out2.hard_gates)) auditHardGates = out2.hard_gates.filter(x=> typeof x==='string');
-      if(Number.isFinite(out2.confidence)) confidence = clamp(Math.round(out2.confidence),0,100);
       if(out2.cap && typeof out2.cap==='string') auditCap = out2.cap;
     }catch(e){
       auditText = 'Auditoría no disponible.';
-      confidence = 60;
       auditHardGates = [];
       auditCap = null;
     }
 
-    // Veredicto final: score -> band -> aplicar cap1 y auditCap y hard gates
     let band = prelimVerdict;
     if(auditCap){ band = minBand(band, auditCap); }
     if(cap1){ band = minBand(band, cap1); }
-    if(auditHardGates.length){ band = minBand(band, 'Malo'); } // gatea a NO compra
+    if(auditHardGates.length){ band = minBand(band, 'Malo'); }
 
     const json = {
       source:'openai',
@@ -98,7 +91,6 @@ export default async function handler(req,res){
       weightGuessKg: Number.isFinite(weightGuessKg) ? weightGuessKg : null,
       score: prelimScore,
       verdictBand: band,
-      confidence,
       auditText,
       auditHardGates: auditHardGates,
       diseaseFindings: diseaseFindings
