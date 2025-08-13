@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GanadoPro • v34</title>
+<title>GanadoPro • v35</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -34,7 +34,7 @@ small.dim{color:var(--muted)}
 <script>
 (function(){
   function byId(id){return document.getElementById(id)}
-  function getApi(){try{return localStorage.getItem('ganadopro.apiBase')||'/api'}catch(e){return '/api'}}
+  function getApi(){try{return localStorage.getItem('ganadopro.apiBase')||'/api'}catch(e){return'/api'}}
   function saveApi(v){try{localStorage.setItem('ganadopro.apiBase',v)}catch(e){}}
   function setBadge(text,ok){var el=byId('health');if(!el)return;el.textContent=text;el.style.color=ok?'#86efac':'#fecaca'}
   async function health(){var base=getApi();var url=(base||'/api').replace(/\/$/,'')+'/health';try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),3500);const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);const j=await r.json();setBadge(j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave',j.hasKey);byId('health').href=url}catch(e){setBadge('API: error',false);byId('health').href=url}}
@@ -53,8 +53,8 @@ small.dim{color:var(--muted)}
   <header>
     <div class="logo">GP</div>
     <div>
-      <div style="font-weight:800;font-size:20px">GanadoPro • v34</div>
-      <div style="color:var(--muted);font-size:12px">Rangos CRC/kg integrados (tus subastas) · Diagnóstico</div>
+      <div style="font-weight:800;font-size:20px">GanadoPro • v35</div>
+      <div style="color:var(--muted);font-size:12px">Fix decisión compra + normalización de categorías</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <a class="pill" id="health" href="#">API: verificando…</a>
@@ -162,7 +162,7 @@ small.dim{color:var(--muted)}
   const status=$('#status'); const preview=$('#preview'); const imgWrap=$('#imgWrap');
   const fileHidden=$('#file'); const diag=$('#diag'); function log(m){ if(!diag) return; diag.textContent+=(diag.textContent?'\\n':'')+m; }
 
-  // Baselines de CRC/kg derivadas de tus 3 capturas (aprox.; puedes editarlas en el código)
+  // Baselines de CRC/kg
   const PRICE_BASELINES={
     "ternero":{min:1400,max:2080,src:"2022–2025"},
     "novillo":{min:1500,max:2090,src:"2022–2025"},
@@ -173,23 +173,34 @@ small.dim{color:var(--muted)}
     "macho_criollo":{min:850,max:1050,src:"2022–2025"}
   };
 
-  function lerp(a,b,t){return a+(b-a)*t}
-  function decideKgRange(verdict,cat){
-    const base=PRICE_BASELINES[(cat||'').toLowerCase()]||null;
-    if(!base) return {min:null,max:null,note:'Sin base histórica para '+cat};
-    if(verdict==='Muy malo'||verdict==='Malo') return {min:null,max:null,note:'NO COMPRAR (morfología/condición).'};
-    if(verdict==='Regular') return {min:Math.round(base.min), max:Math.round(lerp(base.min,base.max,0.5)), note:'Conservador (mitad baja del rango histórico).'};
-    if(verdict==='Bueno') return {min:Math.round(lerp(base.min,base.max,0.55)), max:Math.round(lerp(base.min,base.max,0.9)), note:'Vale la pena (parte alta, sin llegar al tope).'};
-    // Excelente
-    return {min:Math.round(lerp(base.min,base.max,0.7)), max:Math.round(base.max*1.08), note:'Premium (tope + ~8%).'};
+  function normCat(s){
+    s=(s||'').toLowerCase().trim();
+    const map={
+      "vaca_descarte":"vaca","vaca lechera":"vaca","vaca parida":"vaca",
+      "vaquilla":"novilla","novilla":"novilla",
+      "ternera":"ternero","becerro":"ternero","becerra":"ternero",
+      "torete":"novillo","novillo gordo":"novillo",
+      "macho criollo":"macho_criollo"
+    };
+    return map[s]||s;
   }
 
-  async function fileToDataURL(file){return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});}
-  async function compress(file,maxSide=1400,quality=0.8){const dataUrl=await fileToDataURL(file);const img=new Image();img.src=dataUrl;await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('No se pudo decodificar imagen'))});const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));const w=Math.round(img.naturalWidth*scale),h=Math.round(img.naturalHeight*scale);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(img,0,0,w,h);const out=c.toDataURL('image/jpeg',quality);return{dataUrl:out};}
+  function lerp(a,b,t){return a+(b-a)*t}
+  function decideKgRange(verdict,cat){
+    const base=PRICE_BASELINES[cat]||null;
+    if(!base) return {base:null,min:null,max:null,note:'Sin base histórica para '+cat};
+    if(verdict==='Muy malo'||verdict==='Malo') return {base, min:null,max:null,note:'NO COMPRAR (morfología/condición).'};
+    if(verdict==='Regular') return {base, min:Math.round(base.min), max:Math.round(lerp(base.min,base.max,0.5)), note:'Conservador (mitad baja).'};
+    if(verdict==='Bueno') return {base, min:Math.round(lerp(base.min,base.max,0.55)), max:Math.round(lerp(base.min,base.max,0.9)), note:'Parte alta, sin tope.'};
+    return {base, min:Math.round(lerp(base.min,base.max,0.7)), max:Math.round(base.max*1.08), note:'Premium (tope + ~8%).'};
+  }
   function gaugeColor(s){if(s<45)return'#ef4444';if(s<58)return'#f59e0b';if(s<72)return'#eab308';if(s<90)return'#10b981';return'#22c55e'}
   function flagToEs(f){const d={'hock_angle_closed':'Corvejón cerrado: vigilar','hock_angle_watch':'Ángulo de corvejón subóptimo','topline_curved':'Dorso curvado','steep_rump':'Grupa muy caída','underweight':'Condición corporal baja'};return d[f]||f.replaceAll('_',' ')}
   function badgeClass(v){if(v==='Excelente'||v==='Bueno')return'badge ok';if(v==='Regular')return'badge warn';return'badge bad'}
   function summarize(r){const m=r.morphology||{};const bcs=Number(r.bcs)||NaN;const bits=[];if(Number.isFinite(bcs)){if(bcs<2.3)bits.push('condición baja (BCS '+bcs.toFixed(1)+')');else if(bcs>3.8)bits.push('condición alta (BCS '+bcs.toFixed(1)+')');else bits.push('BCS adecuado ('+bcs.toFixed(1)+')');}if(Number.isFinite(m.bodyLenToHeight))bits.push('largo/alzada '+m.bodyLenToHeight.toFixed(2));if(Number.isFinite(m.hockAngleDeg))bits.push('corvejón ~'+Math.round(m.hockAngleDeg)+'°');if(Number.isFinite(m.toplineDeviation))bits.push('desv. dorso '+m.toplineDeviation.toFixed(2));return'Evaluación automática: '+bits.join(' · ')}
+
+  async function fileToDataURL(file){return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});}
+  async function compress(file,maxSide=1400,quality=0.8){const dataUrl=await fileToDataURL(file);const img=new Image();img.src=dataUrl;await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('No se pudo decodificar imagen'))});const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));const w=Math.round(img.naturalWidth*scale),h=Math.round(img.naturalHeight*scale);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(img,0,0,w,h);const out=c.toDataURL('image/jpeg',quality);return{dataUrl:out};}
 
   async function callAnalyze(imageDataUrl){
     const url=(state.apiBase||'/api').replace(/\/$/,'')+'/analyze';
@@ -199,20 +210,31 @@ small.dim{color:var(--muted)}
   }
 
   function paintFinance(r){
-    const cat=(r.categoryGuess||'').toLowerCase();
-    const base=PRICE_BASELINES[cat]||null;
+    const raw=(r.categoryGuess||'').toLowerCase();
+    const cat=normCat(raw);
     const v=r.verdictBand||'–';
     const kg=decideKgRange(v,cat);
     const panel=$('#finance'); panel.style.display='block';
-    $('#fi_cat').textContent=cat||'–';
-    $('#fi_w').textContent=Number.isFinite(r.weightGuessKg)? nf.format(r.weightGuessKg)+' kg':'–';
-    $('#fi_min').textContent=base? nf.format(base.min):'–';
-    $('#fi_max').textContent=base? nf.format(base.max):'–';
-    const buy=$('#buy_dec'); buy.textContent=(kg.min==null?'NO COMPRAR':v); buy.className=badgeClass(kg.min==null? 'Malo': v);
-    $('#buy_rng').textContent=(kg.min==null)? '—' : ('₡'+nf.format(kg.min)+' – ₡'+nf.format(kg.max));
-    $('#buy_note').textContent=kg.note + (base? ' · fuente '+base.src:' · sin base');
-    $('#fi_rng').textContent=(kg.min==null)? '—' : ('₡'+nf.format(kg.min)+' – ₡'+nf.format(kg.max));
-    $('#fi_note').textContent=(base? 'Rangos derivados de tus capturas (aprox.). Modificables en PRICE_BASELINES.': 'Agrega base en PRICE_BASELINES.');
+    $('#fi_cat').textContent=raw||'–';
+    $('#fi_w').textContent=Number.isFinite(r.weightGuessKg)? new Intl.NumberFormat('es-CR').format(r.weightGuessKg)+' kg':'–';
+    if(!kg.base){
+      // No hay base histórica para esa categoría: NO anulamos la decisión
+      const label=(v==='Muy malo'||v==='Malo')?'NO COMPRAR':v;
+      const buy=$('#buy_dec'); buy.textContent=label; buy.className=badgeClass(label==='NO COMPRAR'?'Malo':v);
+      $('#buy_rng').textContent='—'; $('#buy_note').textContent='Sin base histórica para “'+raw+'”. Usa criterio local.';
+      $('#fi_min').textContent='—'; $('#fi_max').textContent='—'; $('#fi_rng').textContent='—'; $('#fi_note').textContent='Sin base para esta categoría.';
+      return;
+    }
+    const base=kg.base;
+    $('#fi_min').textContent=new Intl.NumberFormat('es-CR').format(base.min);
+    $('#fi_max').textContent=new Intl.NumberFormat('es-CR').format(base.max);
+    const buy=$('#buy_dec'); const decisionLabel=(v==='Muy malo'||v==='Malo')?'NO COMPRAR':v;
+    buy.textContent=decisionLabel; buy.className=badgeClass(decisionLabel==='NO COMPRAR'?'Malo':v);
+    const rngTxt = (kg.min==null)? '—' : ('₡'+new Intl.NumberFormat('es-CR').format(kg.min)+' – ₡'+new Intl.NumberFormat('es-CR').format(kg.max));
+    $('#buy_rng').textContent=rngTxt;
+    $('#buy_note').textContent=kg.note + ' · fuente '+base.src;
+    $('#fi_rng').textContent=rngTxt;
+    $('#fi_note').textContent='Rangos de referencia (editable en PRICE_BASELINES).';
   }
 
   async function analyze(file){
@@ -224,7 +246,7 @@ small.dim{color:var(--muted)}
 
       $('#report').style.display='block';
       $('#src').textContent='Fuente: '+(r.source==='heuristic'?'heurística':'IA OpenAI')+(r.note? ' — '+r.note : '');
-      $('#r_sex').textContent=r.sex||'–'; $('#r_cat').textContent=r.categoryGuess||'–'; $('#r_age').textContent=Number.isFinite(r.ageGuessMonths)? (r.ageGuessMonths+' meses'):'–'; $('#r_w').textContent=Number.isFinite(r.weightGuessKg)? nf.format(r.weightGuessKg)+' kg':'–';
+      $('#r_sex').textContent=r.sex||'–'; $('#r_cat').textContent=r.categoryGuess||'–'; $('#r_age').textContent=Number.isFinite(r.ageGuessMonths)? (r.ageGuessMonths+' meses'):'–'; $('#r_w').textContent=Number.isFinite(r.weightGuessKg)? new Intl.NumberFormat('es-CR').format(r.weightGuessKg)+' kg':'–';
       $('#m_body').textContent=(r.morphology&&Number.isFinite(r.morphology.bodyLenToHeight))? r.morphology.bodyLenToHeight.toFixed(2):'–';
       $('#m_belly').textContent=(r.morphology&&Number.isFinite(r.morphology.bellyDepthRatio))? r.morphology.bellyDepthRatio.toFixed(2):'–';
       $('#m_hock').textContent=(r.morphology&&Number.isFinite(r.morphology.hockAngleDeg))? r.morphology.hockAngleDeg.toFixed(0):'–';
