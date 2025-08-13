@@ -35,7 +35,6 @@ function guardBand({bcs,emaciation,healthFlags,diseaseFindings,category,sex,ageM
   if(emaciation===true) cap=minBand(cap,'Muy malo');
   const risky=['cojera','claudicación','tos','descarga nasal','diarrea','herida','heridas','bloat','timpanismo'];
   if(Array.isArray(diseaseFindings)&&diseaseFindings.some(x=> typeof x==='string' && risky.some(rx=> x.toLowerCase().includes(rx)))) cap=minBand(cap,'Malo');
-  // corvejón cerrado solo capea a Regular y solo si la pose es fiable
   const closed = Array.isArray(healthFlags) && healthFlags.includes('hock_angle_closed');
   const rotated = posture && Number.isFinite(posture.rotationDeg) && posture.rotationDeg>20;
   const notSide = posture && typeof posture.view==='string' && !/side|lateral/i.test(posture.view);
@@ -59,7 +58,6 @@ export default async function handler(req,res){
     const key=process.env.OPENAI_API_KEY; const model=process.env.OPENAI_MODEL||'gpt-4o-mini';
     if(!key) return res.status(200).json(heuristic());
 
-    // PASO 1: extracción numérica + postura (anti-defaults, detail: high)
     const sys1 = "Eres un evaluador de ganado para engorde. Devuelve SOLO JSON con métricos numéricos estrictos dentro de rangos fisiológicos.";
     const user1 = {type:'text', text: "Extrae EXCLUSIVAMENTE desde la IMAGEN (no inventes). Si alguna medida NO es visible/fiable por rotación, oclusión o blur, devuélvela como null y explica en 'posture'. Evita valores redondos por defecto (1.50, 0.50, 130, 0.30, 0.10). Usa decimales realistas. Campos: morphology{bodyLenToHeight(1.0-2.5), bellyDepthRatio(0.2-1.2), hockAngleDeg(110-180), rumpSlope(-0.4-0.4), toplineDeviation(0.0-0.6)}, bcs(1-5), sex('macho'/'hembra'), categoryGuess('ternero','novillo','toro','vaca','novilla','vaquilla','macho criollo'), ageGuessMonths, weightGuessKg, diseaseFindings[], posture{view, rotationDeg, occlusion, truncation, blur, lighting, shadowStrong}. SOLO JSON."};
     let out1;
@@ -95,11 +93,9 @@ export default async function handler(req,res){
     const prelimScore = scoreFattening({metrics:morph,bcs,sex,ageMonths:ageGuessMonths,category:categoryGuess});
     let prelimVerdict = bandFromScore(prelimScore);
 
-    // HARD GATES desde paso 1
     const gates = (diseaseFindings||[]).filter(s => typeof s==='string' && HARD_GATES.some(g => s.toLowerCase().includes(g)));
     let cap1 = guardBand({bcs,emaciation: gates.some(x=>x.toLowerCase().includes('emaci')),healthFlags,diseaseFindings,category:categoryGuess,sex,ageMonths:ageGuessMonths,posture});
 
-    // PASO 2: auditoría (usa números)
     let auditText='';
     let auditHardGates=[];
     let auditCap=null;
@@ -119,7 +115,6 @@ export default async function handler(req,res){
       auditCap = null;
     }
 
-    // Veredicto final
     let band = prelimVerdict;
     if(defaultsSuspect){ auditText = (auditText? auditText+' ' : '') + 'Detección: valores genéricos sospechosos. Repite la foto lateral o reintenta.'; }
     if(auditCap){ band = minBand(band, auditCap); }
