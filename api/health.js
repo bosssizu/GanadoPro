@@ -1,2 +1,2 @@
 export const config = { runtime: 'nodejs' };
-export default function handler(req,res){ res.setHeader('Access-Control-Allow-Origin','*'); if(req.method==='OPTIONS') return res.status(204).end(); res.status(200).json({ hasKey: Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim()), model: process.env.OPENAI_MODEL || 'gpt-4o-mini', env: process.env.VERCEL_ENV || null }); }
+export default function handler(req,res){ res.setHeader('Access-Control-Allow-Origin','*'); if(req.method==='OPTIONS') return res.status(204).end(); res.status(200).json({ hasKey: Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim()), model: process.env.OPENAI_MODEL || 'gpt-4o-mini' }); }

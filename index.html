@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GanadoPro • v33</title>
+<title>GanadoPro • v34</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--brand:#22d3ee}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -41,7 +41,7 @@ small.dim{color:var(--muted)}
   window.addEventListener('DOMContentLoaded',function(){
     var cfg=byId('cfgApi');if(cfg){cfg.onclick=function(){var cur=getApi();var val=prompt('Base de API (ej: /api o https://tuapp.vercel.app/api)',cur);if(!val)return;saveApi(val);health();alert('API base guardada: '+val)}};
     var rst=byId('resetApi');if(rst){rst.onclick=function(){saveApi('/api');alert('API base restablecida a /api');health();}};
-    var file=byId('file');var btn=byId('btnUpload');var lbl=byId('lblUpload');if(btn&&file)btn.onclick=function(){file.click()};if(lbl&&file)lbl.onclick=function(){file.click()};
+    var file=byId('file');var btn=byId('btnUpload');if(btn&&file)btn.onclick=function(){file.click();};
     var drop=byId('dropArea');if(drop&&file){['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));drop.addEventListener('drop',e=>{var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length){file.files=fs;file.dispatchEvent(new Event('change'))}})}
     health();
   });
@@ -53,8 +53,8 @@ small.dim{color:var(--muted)}
   <header>
     <div class="logo">GP</div>
     <div>
-      <div style="font-weight:800;font-size:20px">GanadoPro • v33</div>
-      <div style="color:var(--muted);font-size:12px">Robusto · Demo/Heurística · Diagnóstico mejorado</div>
+      <div style="font-weight:800;font-size:20px">GanadoPro • v34</div>
+      <div style="color:var(--muted);font-size:12px">Rangos CRC/kg integrados (tus subastas) · Diagnóstico</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <a class="pill" id="health" href="#">API: verificando…</a>
@@ -68,16 +68,12 @@ small.dim{color:var(--muted)}
     <div class="grid">
       <div class="card" id="dropArea">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <label for="file" class="btn" id="lblUpload">Subir imagen</label>
-          <button id="btnUpload" class="btn ghost" type="button">Elegir</button>
+          <button id="btnUpload" class="btn" type="button">Elegir imagen</button>
           <input id="file" type="file" accept="image/*" capture="environment" style="display:none">
-          <input id="fileNative" type="file" accept="image/*" style="background:#0b1325;color:#e5e7eb;border:1px solid var(--line);border-radius:8px;padding:8px">
-          <button id="btnDemo" class="btn" type="button">Probar demo (heurística)</button>
           <button id="btnReset" class="btn ghost" type="button">Reset</button>
           <div id="status" class="pill">Listo para cargar (puedes pegar o arrastrar imagen)</div>
         </div>
         <div id="imgWrap" style="margin-top:10px;display:none"><img id="preview" class="preview" alt="preview"></div>
-        <small class="dim">Consejo: si no aparece el informe, abre Diagnóstico y copia el texto para soporte.</small>
       </div>
 
       <div id="report" class="card" style="display:none">
@@ -121,28 +117,18 @@ small.dim{color:var(--muted)}
       </div>
 
       <div id="finance" class="card" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-weight:700">Finanzas · Rango recomendado</div>
-          <div class="pill" id="fi_sample">Muestra: –</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700">Rango CRC/kg sugerido</div>
+          <div class="pill" id="fi_src">Fuente: subastas CR (2022–2025)</div>
         </div>
-        <div class="grid" style="grid-template-columns:2fr 1fr;gap:12px">
-          <div>
-            <div class="kpi">
-              <div><div class="lbl">CRC/kg P25</div><div id="fi_p25" class="val">–</div></div>
-              <div><div class="lbl">CRC/kg P50</div><div id="fi_p50" class="val">–</div></div>
-              <div><div class="lbl">CRC/kg P75</div><div id="fi_p75" class="val">–</div></div>
-              <div><div class="lbl">Peso usado (kg)</div><div id="fi_w" class="val">–</div></div>
-            </div>
-            <div class="stat"><div>Total conservador</div><div id="fi_conservative">–</div></div>
-            <div class="stat"><div>Total medio</div><div id="fi_mid">–</div></div>
-            <div class="stat"><div>Total alto</div><div id="fi_high">–</div></div>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:6px">Decisión</div>
-            <div id="fi_decision" class="badge">–</div>
-            <div id="fi_note" style="margin-top:6px;color:var(--muted)">Carga datos de subastas para precisión.</div>
-          </div>
+        <div class="kpi">
+          <div><div class="lbl">Categoría usada</div><div id="fi_cat" class="val">–</div></div>
+          <div><div class="lbl">Peso usado</div><div id="fi_w" class="val">–</div></div>
+          <div><div class="lbl">CRC/kg (mín)</div><div id="fi_min" class="val">–</div></div>
+          <div><div class="lbl">CRC/kg (máx)</div><div id="fi_max" class="val">–</div></div>
         </div>
+        <div class="stat"><div>Precio recomendado por kg</div><div id="fi_rng" class="val">–</div></div>
+        <small class="dim" id="fi_note">—</small>
       </div>
     </div>
 
@@ -151,12 +137,9 @@ small.dim{color:var(--muted)}
         <div style="font-weight:700;margin-bottom:6px">Rango para comprar (recomendado)</div>
         <div class="kpi">
           <div><div class="lbl">Decisión</div><div id="buy_dec" class="badge">–</div></div>
-          <div><div class="lbl">Rango recomendado</div><div id="buy_rng" class="val">–</div></div>
+          <div><div class="lbl">CRC/kg</div><div id="buy_rng" class="val">–</div></div>
         </div>
-        <div class="stat"><div>CRC/kg P25</div><div id="buy_p25">–</div></div>
-        <div class="stat"><div>CRC/kg P50</div><div id="buy_p50">–</div></div>
-        <div class="stat"><div>CRC/kg P75</div><div id="buy_p75">–</div></div>
-        <div class="pill" id="buy_note">Carga datos de subasta para precisión.</div>
+        <div class="pill" id="buy_note">—</div>
       </div>
       <div class="card">
         <div style="font-weight:700;margin-bottom:6px">Criterios de “No comprar”</div>
@@ -177,81 +160,70 @@ small.dim{color:var(--muted)}
   const nf=new Intl.NumberFormat('es-CR');
   const state={ apiBase: localStorage.getItem('ganadopro.apiBase') || '/api' };
   const status=$('#status'); const preview=$('#preview'); const imgWrap=$('#imgWrap');
-  const fileHidden=$('#file'); const fileNative=$('#fileNative');
-  const diag=$('#diag'); function log(msg){ if(!diag) return; diag.textContent += (diag.textContent? '\\n':'') + msg; }
+  const fileHidden=$('#file'); const diag=$('#diag'); function log(m){ if(!diag) return; diag.textContent+=(diag.textContent?'\\n':'')+m; }
 
-  async function fileToDataURL(file){ return await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
-  async function compress(file, maxSide=1400, quality=0.8){
-    const dataUrl=await fileToDataURL(file);
-    const img=new Image(); img.src=dataUrl;
-    await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error('No se pudo decodificar imagen')); });
-    const scale=Math.min(1, maxSide/Math.max(img.naturalWidth, img.naturalHeight));
-    const w=Math.round(img.naturalWidth*scale), h=Math.round(img.naturalHeight*scale);
-    const c=document.createElement('canvas'); c.width=w; c.height=h;
-    c.getContext('2d', {alpha:false, desynchronized:true}).drawImage(img,0,0,w,h);
-    const out=c.toDataURL('image/jpeg', quality);
-    const b64len=out.length-'data:image/jpeg;base64,'.length; const size=Math.floor(b64len*3/4);
-    return { dataUrl:out, bytes:size };
+  // Baselines de CRC/kg derivadas de tus 3 capturas (aprox.; puedes editarlas en el código)
+  const PRICE_BASELINES={
+    "ternero":{min:1400,max:2080,src:"2022–2025"},
+    "novillo":{min:1500,max:2090,src:"2022–2025"},
+    "toro":{min:1500,max:1950,src:"2022–2025"},
+    "vaca":{min:1200,max:1600,src:"2022–2025"},
+    "novilla":{min:1200,max:1650,src:"2022–2025"},
+    "vaquilla":{min:800,max:950,src:"2022–2025"},
+    "macho_criollo":{min:850,max:1050,src:"2022–2025"}
+  };
+
+  function lerp(a,b,t){return a+(b-a)*t}
+  function decideKgRange(verdict,cat){
+    const base=PRICE_BASELINES[(cat||'').toLowerCase()]||null;
+    if(!base) return {min:null,max:null,note:'Sin base histórica para '+cat};
+    if(verdict==='Muy malo'||verdict==='Malo') return {min:null,max:null,note:'NO COMPRAR (morfología/condición).'};
+    if(verdict==='Regular') return {min:Math.round(base.min), max:Math.round(lerp(base.min,base.max,0.5)), note:'Conservador (mitad baja del rango histórico).'};
+    if(verdict==='Bueno') return {min:Math.round(lerp(base.min,base.max,0.55)), max:Math.round(lerp(base.min,base.max,0.9)), note:'Vale la pena (parte alta, sin llegar al tope).'};
+    // Excelente
+    return {min:Math.round(lerp(base.min,base.max,0.7)), max:Math.round(base.max*1.08), note:'Premium (tope + ~8%).'};
   }
 
-  function gaugeColor(score){ if(score<45) return '#ef4444'; if(score<58) return '#f59e0b'; if(score<72) return '#eab308'; if(score<90) return '#10b981'; return '#22c55e'; }
-  function flagToEs(f){ const d={ 'hock_angle_closed':'Corvejón cerrado: vigilar', 'hock_angle_watch':'Ángulo de corvejón subóptimo', 'topline_curved':'Dorso curvado', 'steep_rump':'Grupa muy caída', 'underweight':'Condición corporal baja' }; return d[f]||f.replaceAll('_',' '); }
-  function badgeClass(v){ if(v==='Excelente'||v==='Bueno') return 'badge ok'; if(v==='Regular') return 'badge warn'; return 'badge bad'; }
+  async function fileToDataURL(file){return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});}
+  async function compress(file,maxSide=1400,quality=0.8){const dataUrl=await fileToDataURL(file);const img=new Image();img.src=dataUrl;await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('No se pudo decodificar imagen'))});const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));const w=Math.round(img.naturalWidth*scale),h=Math.round(img.naturalHeight*scale);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(img,0,0,w,h);const out=c.toDataURL('image/jpeg',quality);return{dataUrl:out};}
+  function gaugeColor(s){if(s<45)return'#ef4444';if(s<58)return'#f59e0b';if(s<72)return'#eab308';if(s<90)return'#10b981';return'#22c55e'}
+  function flagToEs(f){const d={'hock_angle_closed':'Corvejón cerrado: vigilar','hock_angle_watch':'Ángulo de corvejón subóptimo','topline_curved':'Dorso curvado','steep_rump':'Grupa muy caída','underweight':'Condición corporal baja'};return d[f]||f.replaceAll('_',' ')}
+  function badgeClass(v){if(v==='Excelente'||v==='Bueno')return'badge ok';if(v==='Regular')return'badge warn';return'badge bad'}
+  function summarize(r){const m=r.morphology||{};const bcs=Number(r.bcs)||NaN;const bits=[];if(Number.isFinite(bcs)){if(bcs<2.3)bits.push('condición baja (BCS '+bcs.toFixed(1)+')');else if(bcs>3.8)bits.push('condición alta (BCS '+bcs.toFixed(1)+')');else bits.push('BCS adecuado ('+bcs.toFixed(1)+')');}if(Number.isFinite(m.bodyLenToHeight))bits.push('largo/alzada '+m.bodyLenToHeight.toFixed(2));if(Number.isFinite(m.hockAngleDeg))bits.push('corvejón ~'+Math.round(m.hockAngleDeg)+'°');if(Number.isFinite(m.toplineDeviation))bits.push('desv. dorso '+m.toplineDeviation.toFixed(2));return'Evaluación automática: '+bits.join(' · ')}
 
-  const DS_KEY='ganadopro.fin.rows';
-  function loadRows(){ try{ return JSON.parse(localStorage.getItem(DS_KEY)||'[]'); }catch{ return []; } }
-  function saveRows(rows){ try{ localStorage.setItem(DS_KEY, JSON.stringify(rows)); }catch{} }
-  function pct(arr,p){ const i=Math.max(0, Math.min(arr.length-1, Math.round((p/100)*(arr.length-1)))); return arr[i]; }
-  function quartiles(rows,cat){ const vals=(rows||[]).map(r=>r.perKgAvg).filter(Number.isFinite).sort((a,b)=>a-b); if(vals.length<3) return null; return { p25:pct(vals,25), p50:pct(vals,50), p75:pct(vals,75), n:vals.length }; }
-
-  function decisionPolicy(verdict,q,weight){
-    if(!Number.isFinite(weight)) return {label:'Sin datos', totals:null, note:'Falta peso estimado'};
-    if(!q){
-      if(verdict==='Muy malo'||verdict==='Malo') return {label:'NO COMPRAR', totals:null, note:'No recomendado por morfología/condición.'};
-      if(verdict==='Regular') return {label:'Conservador', totals:null, note:'Ofertar sólo P25–P50 (referencia local).'};
-      if(verdict==='Bueno') return {label:'Vale la pena', totals:null, note:'Permite pequeño premium sobre P75.'};
-      if(verdict==='Excelente') return {label:'Premium', totals:null, note:'Margen alto sin llegar al tope.'};
-      return {label:'Sin datos', totals:null, note:'Carga precios para precisión.'};
-    }
-    const low=q.p25*weight, mid=q.p50*weight, high=q.p75*weight;
-    if(verdict==='Muy malo'||verdict==='Malo') return {label:'NO COMPRAR', totals:{low,mid,high,recLow:null,recHigh:null}, note:'No recomendado.'};
-    if(verdict==='Regular') return {label:'Conservador', totals:{low,mid,high,recLow:low,recHigh:mid}, note:'P25–P50.'};
-    if(verdict==='Bueno'){ const recLow=mid, recHigh=Math.round(high*1.06); return {label:'Vale la pena', totals:{low,mid,high,recLow,recHigh}, note:'hasta ~+6% sobre P75.'}; }
-    const recLow=mid, recHigh=Math.round(high*1.12); return {label:'Premium', totals:{low,mid,high,recLow,recHigh}, note:'hasta ~+12% sobre P75.'};
-  }
-
-  function updateAside(dec,q,weight){ const b=$('#buy_dec'); b.textContent=dec.label; b.className='badge '+(dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok'); const rng=$('#buy_rng'); if(dec.totals&&Number.isFinite(dec.totals.recLow)&&Number.isFinite(dec.totals.recHigh)){ rng.textContent=nf.format(dec.totals.recLow)+' – '+nf.format(dec.totals.recHigh);} else rng.textContent='—'; $('#buy_p25').textContent=q?nf.format(q.p25):'–'; $('#buy_p50').textContent=q?nf.format(q.p50):'–'; $('#buy_p75').textContent=q?nf.format(q.p75):'–'; $('#buy_note').textContent=dec.note + (Number.isFinite(weight)? ' · peso '+nf.format(weight)+' kg':'' ); }
-
-  function refreshFinancePanel(r){
-    const rows=loadRows(); const weight=Number(r?.weightGuessKg)||NaN; const q=quartiles(rows,r?.categoryGuess||'novillo');
-    const panel=$('#finance'); panel.style.display='block';
-    $('#fi_w').textContent=Number.isFinite(weight)? nf.format(weight) : '–';
-    if(!q){ $('#fi_p25').textContent='–'; $('#fi_p50').textContent='–'; $('#fi_p75').textContent='–'; $('#fi_sample').textContent='Muestra: 0'; const dec=decisionPolicy(r?.verdictBand,null,weight); const b=$('#fi_decision'); b.textContent=dec.label; b.className='badge '+(dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok'); $('#fi_note').textContent=dec.note; $('#fi_conservative').textContent='–'; $('#fi_mid').textContent='–'; $('#fi_high').textContent='–'; updateAside(dec,null,weight); return; }
-    $('#fi_p25').textContent=nf.format(q.p25); $('#fi_p50').textContent=nf.format(q.p50); $('#fi_p75').textContent=nf.format(q.p75); $('#fi_sample').textContent='Muestra: '+q.n;
-    const dec=decisionPolicy(r?.verdictBand,q,weight); const b=$('#fi_decision'); b.textContent=dec.label; b.className='badge '+(dec.label==='NO COMPRAR'?'bad':dec.label==='Conservador'?'warn':'ok'); $('#fi_note').textContent=dec.note; $('#fi_conservative').textContent=nf.format(q.p25*weight); $('#fi_mid').textContent=nf.format(q.p50*weight); $('#fi_high').textContent=nf.format(q.p75*weight) + (dec.totals?.recHigh? ' (máx '+nf.format(dec.totals.recHigh)+')':'');
-    updateAside(dec,q,weight);
-  }
-
-  function summarize(r){ const m=r.morphology||{}; const bcs=Number(r.bcs)||NaN; const bits=[]; if(Number.isFinite(bcs)){ if(bcs<2.3) bits.push('condición baja (BCS '+bcs.toFixed(1)+')'); else if(bcs>3.8) bits.push('condición alta (BCS '+bcs.toFixed(1)+')'); else bits.push('BCS adecuado ('+bcs.toFixed(1)+')'); } if(Number.isFinite(m.bodyLenToHeight)) bits.push('largo/alzada '+m.bodyLenToHeight.toFixed(2)); if(Number.isFinite(m.hockAngleDeg)) bits.push('corvejón ~'+Math.round(m.hockAngleDeg)+'°'); if(Number.isFinite(m.toplineDeviation)) bits.push('desv. dorso '+m.toplineDeviation.toFixed(2)); return 'Evaluación automática: '+bits.join(' · '); }
-
-  async function callAnalyze(imageDataUrl, forceHeur=false){
+  async function callAnalyze(imageDataUrl){
     const url=(state.apiBase||'/api').replace(/\/$/,'')+'/analyze';
-    const body={ imageDataUrl, forceHeur: !!forceHeur };
-    const resp = await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    const txt = await resp.text();
-    if(!resp.ok){ throw new Error('API '+resp.status+': '+txt.slice(0,300)); }
-    try{ return JSON.parse(txt); }catch(e){ throw new Error('JSON parse: '+txt.slice(0,300)); }
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageDataUrl})});
+    const txt=await resp.text(); if(!resp.ok){ throw new Error('API '+resp.status+': '+txt.slice(0,300)); }
+    try{ return JSON.parse(txt); }catch{ throw new Error('JSON parse: '+txt.slice(0,300)); }
+  }
+
+  function paintFinance(r){
+    const cat=(r.categoryGuess||'').toLowerCase();
+    const base=PRICE_BASELINES[cat]||null;
+    const v=r.verdictBand||'–';
+    const kg=decideKgRange(v,cat);
+    const panel=$('#finance'); panel.style.display='block';
+    $('#fi_cat').textContent=cat||'–';
+    $('#fi_w').textContent=Number.isFinite(r.weightGuessKg)? nf.format(r.weightGuessKg)+' kg':'–';
+    $('#fi_min').textContent=base? nf.format(base.min):'–';
+    $('#fi_max').textContent=base? nf.format(base.max):'–';
+    const buy=$('#buy_dec'); buy.textContent=(kg.min==null?'NO COMPRAR':v); buy.className=badgeClass(kg.min==null? 'Malo': v);
+    $('#buy_rng').textContent=(kg.min==null)? '—' : ('₡'+nf.format(kg.min)+' – ₡'+nf.format(kg.max));
+    $('#buy_note').textContent=kg.note + (base? ' · fuente '+base.src:' · sin base');
+    $('#fi_rng').textContent=(kg.min==null)? '—' : ('₡'+nf.format(kg.min)+' – ₡'+nf.format(kg.max));
+    $('#fi_note').textContent=(base? 'Rangos derivados de tus capturas (aprox.). Modificables en PRICE_BASELINES.': 'Agrega base en PRICE_BASELINES.');
   }
 
   async function analyze(file){
     try{
       status.textContent='Procesando imagen…';
-      const comp = await compress(file, 1400, 0.8);
-      status.textContent='Analizando ('+ ( (file.size/1024/1024).toFixed(2) ) +' MB → ~'+ ( (comp.bytes/1024/1024).toFixed(2) ) +' MB)…';
-      const r = await callAnalyze(comp.dataUrl, false);
+      const comp=await compress(file,1400,0.8);
+      status.textContent='Analizando…';
+      const r=await callAnalyze(comp.dataUrl);
 
       $('#report').style.display='block';
-      $('#src').textContent = 'Fuente: ' + (r.source==='heuristic'?'heurística':'IA OpenAI') + (r.note? ' — '+r.note : '');
+      $('#src').textContent='Fuente: '+(r.source==='heuristic'?'heurística':'IA OpenAI')+(r.note? ' — '+r.note : '');
       $('#r_sex').textContent=r.sex||'–'; $('#r_cat').textContent=r.categoryGuess||'–'; $('#r_age').textContent=Number.isFinite(r.ageGuessMonths)? (r.ageGuessMonths+' meses'):'–'; $('#r_w').textContent=Number.isFinite(r.weightGuessKg)? nf.format(r.weightGuessKg)+' kg':'–';
       $('#m_body').textContent=(r.morphology&&Number.isFinite(r.morphology.bodyLenToHeight))? r.morphology.bodyLenToHeight.toFixed(2):'–';
       $('#m_belly').textContent=(r.morphology&&Number.isFinite(r.morphology.bellyDepthRatio))? r.morphology.bellyDepthRatio.toFixed(2):'–';
@@ -264,13 +236,10 @@ small.dim{color:var(--muted)}
       const vb=r.verdictBand||'–'; const vEl=$('#verdict'); vEl.textContent=vb; vEl.className=badgeClass(vb);
       const flags=Array.isArray(r.healthFlags)? r.healthFlags:[]; const ul=$('#flags'); ul.innerHTML=''; const main=$('#mainCaution'); if(flags.length===0){ main.style.display='none'; const li=document.createElement('li'); li.style.color='var(--muted)'; li.textContent='Sin observaciones'; ul.appendChild(li); } else { const order=['underweight','hock_angle_closed','topline_curved','steep_rump','hock_angle_watch']; const sorted=[...flags].sort((a,b)=> order.indexOf(a)-order.indexOf(b)); main.style.display='inline-flex'; main.textContent=flagToEs(sorted[0]); sorted.slice(1).forEach(t=>{ const li=document.createElement('li'); li.textContent=flagToEs(t); ul.appendChild(li); }); }
       $('#r_text').innerHTML = (r.explanation||r.explanation_es) ? (r.explanation||r.explanation_es) : summarize(r);
-      refreshFinancePanel(r);
 
+      paintFinance(r);
       status.textContent='Listo';
-    }catch(err){
-      status.textContent='Error: '+(err&&err.message?err.message:err);
-      log('ERR analyze: '+(err&&err.stack?err.stack:err));
-    }
+    }catch(err){ status.textContent='Error: '+(err&&err.message?err.message:err); log('ERR analyze: '+(err&&err.stack?err.stack:err)); }
   }
 
   function startWithFile(f){
@@ -281,39 +250,8 @@ small.dim{color:var(--muted)}
     analyze(f);
   }
 
-  // DEMO: genera un pequeño JPEG base64 y pide heurística al backend
-  async function runDemo(){
-    try{
-      status.textContent='Demo (heurística)…';
-      const canvas=document.createElement('canvas'); canvas.width=32; canvas.height=20;
-      const ctx=canvas.getContext('2d'); ctx.fillStyle='#222'; ctx.fillRect(0,0,32,20); ctx.fillStyle='#999'; ctx.fillRect(2,4,28,12);
-      const dataUrl=canvas.toDataURL('image/jpeg',0.6);
-      imgWrap.style.display='block'; preview.src=dataUrl;
-      const r = await callAnalyze(dataUrl, true);
-      // pintar igual que analyze()
-      $('#report').style.display='block';
-      $('#src').textContent = 'Fuente: ' + (r.source==='heuristic'?'heurística':'IA OpenAI') + (r.note? ' — '+r.note : '');
-      $('#r_sex').textContent=r.sex||'–'; $('#r_cat').textContent=r.categoryGuess||'–'; $('#r_age').textContent=Number.isFinite(r.ageGuessMonths)? (r.ageGuessMonths+' meses'):'–'; $('#r_w').textContent=Number.isFinite(r.weightGuessKg)? nf.format(r.weightGuessKg)+' kg':'–';
-      $('#m_body').textContent=(r.morphology&&Number.isFinite(r.morphology.bodyLenToHeight))? r.morphology.bodyLenToHeight.toFixed(2):'–';
-      $('#m_belly').textContent=(r.morphology&&Number.isFinite(r.morphology.bellyDepthRatio))? r.morphology.bellyDepthRatio.toFixed(2):'–';
-      $('#m_hock').textContent=(r.morphology&&Number.isFinite(r.morphology.hockAngleDeg))? r.morphology.hockAngleDeg.toFixed(0):'–';
-      $('#m_top').textContent=(r.morphology&&Number.isFinite(r.morphology.toplineDeviation))? r.morphology.toplineDeviation.toFixed(2):'–';
-      $('#m_rump').textContent=(r.morphology&&Number.isFinite(r.morphology.rumpSlope))? r.morphology.rumpSlope.toFixed(2):'–';
-      $('#r_bcs').textContent=Number.isFinite(r.bcs)? r.bcs.toFixed(1):'–';
-      $('#breedTop').textContent=(r.breedGuess && r.breedGuess[0]?.breed) ? r.breedGuess[0].breed : '–';
-      const sc=Number.isFinite(r.score)? r.score : 0; $('#scoreNum').textContent=sc; $('#scoreBar').style.width=sc+'%'; $('#scoreBar').style.background=gaugeColor(sc);
-      const vb=r.verdictBand||'–'; const vEl=$('#verdict'); vEl.textContent=vb; vEl.className=badgeClass(vb);
-      const flags=Array.isArray(r.healthFlags)? r.healthFlags:[]; const ul=$('#flags'); ul.innerHTML=''; const main=$('#mainCaution'); if(flags.length===0){ main.style.display='none'; const li=document.createElement('li'); li.style.color='var(--muted)'; li.textContent='Sin observaciones'; ul.appendChild(li); } else { const order=['underweight','hock_angle_closed','topline_curved','steep_rump','hock_angle_watch']; const sorted=[...flags].sort((a,b)=> order.indexOf(a)-order.indexOf(b)); main.style.display='inline-flex'; main.textContent=flagToEs(sorted[0]); sorted.slice(1).forEach(t=>{ const li=document.createElement('li'); li.textContent=flagToEs(t); ul.appendChild(li); }); }
-      $('#r_text').innerHTML = (r.explanation||r.explanation_es) ? (r.explanation||r.explanation_es) : 'Demo heurística.';
-      refreshFinancePanel(r);
-      status.textContent='Listo (demo)';
-    }catch(err){ status.textContent='Error demo: '+(err&&err.message?err.message:err); log('ERR demo: '+(err&&err.stack?err.stack:err)); }
-  }
-
   document.getElementById('btnReset').onclick = ()=>{ preview.src=''; imgWrap.style.display='none'; document.getElementById('report').style.display='none'; document.getElementById('finance').style.display='none'; status.textContent='Listo para cargar (puedes pegar o arrastrar imagen)'; };
-  document.getElementById('btnDemo').onclick = runDemo;
   fileHidden.addEventListener('change', (e)=> startWithFile(e.target.files && e.target.files[0]));
-  fileNative.addEventListener('change', (e)=> startWithFile(e.target.files && e.target.files[0]));
   window.addEventListener('paste', (e)=>{ const items=e.clipboardData?.items||[]; for(const it of items){ if(it.type && it.type.startsWith('image/')){ const f=it.getAsFile(); if(f) { startWithFile(f); break; } } } });
 })();</script>
 </body>
