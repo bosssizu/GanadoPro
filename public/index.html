@@ -3,104 +3,204 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GanadoPro • v45</title>
+<title>GanadoPro • v48 Clean</title>
 <style>
-:root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937}
+:root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-.wrap{max-width:980px;margin:0 auto;padding:16px}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:10px}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#14b8a6);display:grid;place-items:center;color:#0b1220;font-weight:900}
+.pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:#9ca3af;background:#0b1325}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
-.row{display:grid;grid-template-columns:1fr;gap:12px}
-.btn{background:#22c55e;color:#0b1220;border:none;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer}
-.pill{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted)}
-.preview{max-width:100%;border-radius:12px;border:1px solid var(--line);margin-top:8px}
-pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);border-radius:8px;padding:8px;color:#9ca3af;max-height:280px;overflow:auto}
+.btn{background:#22c55e;color:#0b1220;border:none;border-radius:12px;padding:12px 16px;font-size:16px;cursor:pointer;font-weight:700}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.grid{display:grid;gap:12px}
 .kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px}
-.kv b{color:#cbd5e1}
-@media (min-width:900px){.row{grid-template-columns:1fr 1fr}}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#0b1325;font-size:12px;color:#cbd5e1}
+.ok{background:rgba(16,185,129,.15);border-color:#065f46;color:#a7f3d0}
+.warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}
+.bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
+.bar{height:12px;background:#111827;border-radius:999px;overflow:hidden}.bar>i{display:block;height:12px;width:0;background:#22c55e;border-radius:999px}
+.preview{max-width:100%;border-radius:12px;border:1px solid var(--line)}
+pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);padding:8px;border-radius:8px;color:#9ca3af;max-height:220px;overflow:auto}
+.list{margin:6px 0 0 18px}
+@media (max-width:900px){.row{grid-template-columns:1fr}.btn.block{width:100%}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1 style="margin:0 0 8px 0">GanadoPro • v45</h1>
-  <div class="pill" id="health">API: verificando…</div>
+  <header>
+    <div class="logo">GP</div>
+    <div>
+      <div style="font-weight:800;font-size:20px">GanadoPro • v48</div>
+      <div style="color:#9ca3af;font-size:12px">Análisis morfológico + BCS + finanzas + recomendación</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <span id="health" class="pill">API: verificando…</span>
+      <details class="pill"><summary>Diag</summary><pre id="diag"></pre></details>
+    </div>
+  </header>
 
-  <div class="row" style="margin-top:12px">
-    <div class="card">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input id="file" type="file" accept="image/*">
-        <button id="analyze" class="btn">Analizar</button>
-        <button id="reset" class="pill">Reset</button>
-        <div id="status" class="pill" style="margin-left:auto">Listo</div>
+  <div class="row">
+    <div class="grid">
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="file" type="file" accept="image/*">
+          <button id="analyze" class="btn">Analizar</button>
+          <button id="reset" class="btn ghost">Reset</button>
+          <div id="status" class="pill" style="margin-left:auto">Listo</div>
+        </div>
+        <div id="imgWrap" style="margin-top:10px;display:none"><img id="preview" class="preview" alt="preview"></div>
       </div>
-      <img id="preview" class="preview" style="display:none" alt="preview">
-      <small style="color:var(--muted)">La imagen se envía a <code>/api/analyze</code> como JSON { imageDataUrl }.</small>
+
+      <div id="report" class="card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:700">Informe técnico</div>
+          <div id="src" style="font-size:12px;color:#9ca3af"></div>
+        </div>
+
+        <div class="kv">
+          <b>Veredicto</b><span id="r_ver">–</span>
+          <b>Score</b><span id="r_score">–</span>
+          <b>BCS</b><span id="r_bcs">–</span>
+          <b>Sexo/Categoría</b><span id="r_sexcat">–</span>
+          <b>Edad/Peso est.</b><span id="r_agew">–</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+          <div class="card">
+            <div style="font-weight:600;margin-bottom:6px">Morfología</div>
+            <div class="kv" id="morph"></div>
+          </div>
+          <div class="card">
+            <div style="font-weight:600;margin-bottom:6px">Sub-scores</div>
+            <div class="kv" id="subs"></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+          <div>
+            <div class="badge warn" id="mainC" style="display:none"></div>
+            <ul id="flags" class="list"></ul>
+          </div>
+          <div>
+            <div class="bar"><i id="scoreBar"></i></div>
+          </div>
+        </div>
+
+        <div style="font-weight:600;margin-top:8px;margin-bottom:6px">Resumen IA</div>
+        <div id="r_text" style="color:#d1d5db">—</div>
+      </div>
+
+      <div id="finance" class="card" style="display:none">
+        <div style="font-weight:700;margin-bottom:6px">Rango CRC/kg sugerido</div>
+        <div class="kv">
+          <b>Categoría</b><span id="fi_cat">–</span>
+          <b>Peso usado</b><span id="fi_w">–</span>
+          <b>CRC/kg (mín)</b><span id="fi_min">–</span>
+          <b>CRC/kg (máx)</b><span id="fi_max">–</span>
+          <b>Recomendado</b><span id="fi_rng">–</span>
+        </div>
+        <small id="fi_note" style="color:#9ca3af">—</small>
+      </div>
     </div>
 
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:6px">Resultados</div>
-      <div id="out" class="kv">
-        <b>Estado</b><span>Sin datos</span>
+    <aside class="grid">
+      <div id="buyCard" class="card">
+        <div style="font-weight:700;margin-bottom:6px">Rango para comprar</div>
+        <div class="kv">
+          <b>Decisión</b><span id="buy_dec" class="badge">–</span>
+          <b>CRC/kg</b><span id="buy_rng">–</span>
+        </div>
+        <div class="pill" id="buy_note">—</div>
       </div>
-      <details style="margin-top:8px"><summary>Respuesta cruda</summary><pre id="raw"></pre></details>
-    </div>
+    </aside>
   </div>
 </div>
 
 <script>
-const $=s=>document.querySelector(s);
-const statusEl=$('#status'), fileEl=$('#file'), img=$('#preview'), raw=$('#raw'), out=$('#out');
+const $=s=>document.querySelector(s); const nf=new Intl.NumberFormat('es-CR');
+const statusEl=$('#status'), fileEl=$('#file'), img=$('#preview'), imgWrap=$('#imgWrap'), diag=$('#diag');
+const out={ver:$('#r_ver'),score:$('#r_score'),bcs:$('#r_bcs'),sexcat:$('#r_sexcat'),agew:$('#r_agew'),morph:$('#morph'),subs:$('#subs'),mainC:$('#mainC'),flags:$('#flags'),bar:$('#scoreBar'),rtext:$('#r_text')};
+const fin={cat:$('#fi_cat'),w:$('#fi_w'),min:$('#fi_min'),max:$('#fi_max'),rng:$('#fi_rng'),note:$('#fi_note')};
+const buy={dec:$('#buy_dec'),rng:$('#buy_rng'),note:$('#buy_note')};
 
-async function health(){
-  try{
-    const r=await fetch('/api/health'); const j=await r.json();
-    $('#health').textContent = j.hasKey? ('API: OK ('+(j.model||'')+')') : 'API: sin llave';
-  }catch(e){ $('#health').textContent='API: error'; }
-}
+function log(x){ diag.textContent+=(diag.textContent?'\n':'')+x; }
+async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); $('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave'; }catch{ $('#health').textContent='API: error'; } }
+async function fileToDataURL(file){ const fr=new FileReader(); return await new Promise((res,rej)=>{ fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
+async function compress(file,maxSide=1100,q=0.78){ const url=await fileToDataURL(file); const im=new Image(); im.src=url; await new Promise((res,rej)=>{im.onload=res;im.onerror=rej}); const sc=Math.min(1,maxSide/Math.max(im.naturalWidth,im.naturalHeight)); const w=Math.round(im.naturalWidth*sc),h=Math.round(im.naturalHeight*sc); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(im,0,0,w,h); let out=c.toDataURL('image/jpeg',q); if(out.length>3_500_000){ const blob=await (await fetch(out)).blob(); return await compress(new File([blob],'img.jpg'),900,0.72);} return out; }
 
-async function fileToDataURL(file){
-  const fr=new FileReader();
-  return await new Promise((res,rej)=>{ fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); });
-}
+$('#reset').onclick=()=>{ img.src=''; imgWrap.style.display='none'; $('#report').style.display='none'; $('#finance').style.display='none'; buy.dec.textContent='–'; buy.rng.textContent='–'; buy.note.textContent='—'; statusEl.textContent='Listo'; $('#diag').textContent=''; };
 
-async function compress(file,maxSide=1400,quality=0.82){
-  const url = await fileToDataURL(file);
-  const imgEl=new Image(); imgEl.src=url;
-  await new Promise((res,rej)=>{ imgEl.onload=res; imgEl.onerror=rej; });
-  const scale=Math.min(1, maxSide/Math.max(imgEl.naturalWidth,imgEl.naturalHeight));
-  const w=Math.round(imgEl.naturalWidth*scale), h=Math.round(imgEl.naturalHeight*scale);
-  const c=document.createElement('canvas'); c.width=w; c.height=h;
-  c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(imgEl,0,0,w,h);
-  return c.toDataURL('image/jpeg',quality);
-}
-
-$('#reset').onclick = ()=>{ img.src=''; img.style.display='none'; out.innerHTML='<b>Estado</b><span>Sin datos</span>'; statusEl.textContent='Listo'; };
-
-$('#analyze').onclick = async ()=>{
+$('#analyze').onclick=async()=>{
   try{
     if(!fileEl.files.length) return alert('Selecciona una imagen');
-    statusEl.textContent='Procesando imagen…';
-    const dataUrl = await compress(fileEl.files[0]);
-    img.src=dataUrl; img.style.display='block';
+    statusEl.textContent='Procesando…'; const dataUrl=await compress(fileEl.files[0]); img.src=dataUrl; imgWrap.style.display='block';
     statusEl.textContent='Analizando…';
-    const r = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ imageDataUrl: dataUrl }) });
-    const text = await r.text();
-    raw.textContent=text;
-    let json=null;
-    try{ json = JSON.parse(text); }catch{ throw new Error('La API no devolvió JSON. Revisa /api/analyze en Vercel.'); }
-    statusEl.textContent='Listo';
-
-    const m=json.morphology||{};
-    out.innerHTML = `
-      <b>Veredicto</b><span>${json.verdictBand||json.verdict||'—'} (score ${json.score??'—'})</span>
-      <b>BCS</b><span>${json.bcs??'—'} / ${json.bcs9??'—'}</span>
-      <b>Morfología</b><span>largo/alzada ${m.bodyLenToHeight??'—'}, abdomen/alzada ${m.bellyDepthRatio??'—'}, corvejón ${m.hockAngleDeg??'—'}°, dorso ${m.toplineDeviation??'—'}, grupa ${m.rumpSlope??'—'}</span>
-      <b>Notas</b><span>${json.explanation||json.auditText||'—'}</span>`;
-  }catch(e){
-    statusEl.textContent='Error';
-    out.innerHTML = `<b>Error</b><span>${(e && e.message) ? e.message : e}</span>`;
-  }
+    const r=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageDataUrl:dataUrl})});
+    const text=await r.text(); log('Status '+r.status); log(text.slice(0,300));
+    let j=null; try{ j=JSON.parse(text); }catch{ throw new Error('La API no devolvió JSON.'); }
+    render(j);
+  }catch(e){ statusEl.textContent='Error'; alert(e.message||e); }
 };
 
+function render(j){
+  statusEl.textContent='Listo'; $('#report').style.display='block'; $('#finance').style.display='block';
+  const m=j.morphology||{};
+
+  out.ver.textContent=(j.verdictBand||'—');
+  out.score.textContent=(j.score??'—');
+  out.bcs.textContent=(j.bcs??'—')+(j.bcs9?(' / '+j.bcs9):'');
+  out.sexcat.textContent=[j.sex,j.categoryGuess].filter(Boolean).join(' • ')||'—';
+  out.agew.textContent=[j.ageGuessMonths?j.ageGuessMonths+' m':'', j.weightGuessKg?j.weightGuessKg+' kg':''].filter(Boolean).join(' • ')||'—';
+  out.morph.innerHTML = ['bodyLenToHeight','bellyDepthRatio','hockAngleDeg','toplineDeviation','rumpSlope'].map(k=>`<b>${k}</b><span>${m[k]??'—'}</span>`).join('');
+
+  // Sub-scores simples (heurística)
+  const sbcs = Math.round((Math.max(0,Math.min(5, j.bcs||3))/5)*100);
+  const sloco = Math.round((1 - Math.abs((m.hockAngleDeg||145)-145)/35)*100);
+  const stopl = Math.round((1 - Math.min(1,(m.toplineDeviation||0)/0.25))*100);
+  const sprop = Math.round((1 - Math.abs((m.bodyLenToHeight||1.6)-1.6)/0.5)*100);
+  out.subs.innerHTML = `<b>BCS</b><span>${sbcs}</span><b>Locomoción</b><span>${sloco}</span><b>Dorso</b><span>${stopl}</span><b>Proporciones</b><span>${sprop}</span>`;
+
+  // Precauciones
+  const flags=[];
+  if((m.hockAngleDeg||150)<130) flags.push('Corvejón cerrado');
+  if((m.toplineDeviation||0)>0.18) flags.push('Dorso muy cóncavo');
+  if((m.bellyDepthRatio||0)>0.75) flags.push('Abdomen muy profundo');
+  if((j.bcs||0)<2.3) flags.push('BCS bajo');
+  out.flags.innerHTML = flags.map(f=>`<li>${f}</li>`).join('');
+  if(flags.length){ out.mainC.style.display='inline-flex'; out.mainC.textContent = flags[0]; } else { out.mainC.style.display='none'; }
+
+  // Barra score
+  const sc = Math.max(0,Math.min(100, j.score||0)); out.bar.style.width = sc+'%'; out.bar.style.background = sc>=72? '#22c55e' : sc>=58? '#f59e0b' : '#ef4444';
+
+  // Resumen IA
+  out.rtext.textContent = j.explanation || '—';
+
+  // Finanzas (baselines + ajuste por veredicto)
+  const base={ternero:[1300,1550], novillo:[1400,1650], toro:[1350,1600], vaca:[1100,1350], novilla:[1200,1500]};
+  const cat=((j.categoryGuess||'').toLowerCase().includes('novillo')?'novillo':
+             (j.categoryGuess||'').toLowerCase().includes('novilla')?'novilla':
+             (j.sex||'').toLowerCase().includes('macho')?'toro':
+             (j.sex||'').toLowerCase().includes('hembra')?'vaca':'ternero');
+  const [bmin,bmax] = base[cat] || [1100,1400];
+  let adj=[1,1]; // multipliers
+  const v=(j.verdictBand||'').toLowerCase();
+  if(v.includes('muy malo')||v.includes('malo')) adj=[0,0];
+  else if(v.includes('regular')) adj=[0.9,1.0];
+  else if(v.includes('bueno')) adj=[1.0,1.1];
+  else if(v.includes('excelente')) adj=[1.05,1.18];
+  const recMin = Math.round(bmin*adj[0]); const recMax = Math.round(bmax*adj[1]);
+  fin.cat.textContent = cat; fin.w.textContent = (j.weightGuessKg? (j.weightGuessKg+' kg') : '—');
+  fin.min.textContent = nf.format(bmin); fin.max.textContent = nf.format(bmax);
+  fin.rng.textContent = nf.format(recMin)+' – '+nf.format(recMax);
+  fin.note.textContent = v.includes('regular')?'Conservador: preferir tramo bajo del rango.': v.includes('bueno')?'Puede pagarse un poco sobre promedio.': v.includes('excelente')?'Puntual margen alto, sin llegar a tope.': v.includes('malo')?'No comprar.':'—';
+
+  // Compra
+  if(adj[0]===0 && adj[1]===0){ buy.dec.textContent='NO COMPRAR'; buy.dec.className='badge bad'; buy.rng.textContent='—'; buy.note.textContent='Descartado por veredicto/flags.'; }
+  else{ buy.dec.textContent='COMPRAR'; buy.dec.className='badge ok'; buy.rng.textContent=nf.format(recMin)+' – '+nf.format(recMax)+' CRC/kg'; buy.note.textContent=fin.note.textContent; }
+}
 health();
 </script>
 </body>

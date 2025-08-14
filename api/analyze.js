@@ -1,3 +1,4 @@
+function setJSON(res){ try{res.setHeader('Content-Type','application/json; charset=utf-8');}catch{} }
 function setCORS(res){
   try{
     res.setHeader('Access-Control-Allow-Origin','*');
@@ -33,44 +34,53 @@ async function openaiJSON(key, model, messages){
   } finally{ clearTimeout(to); }
 }
 module.exports = async (req,res)=>{
-  setCORS(res);
+  setCORS(res); setJSON(res);
   if(req.method==='OPTIONS') return res.status(204).end();
   try{
-    if(req.method!=='POST') return res.status(405).json({error:'Use POST {imageDataUrl}'});
+    if(req.method!=='POST') return res.status(405).end(JSON.stringify({error:'Use POST {imageDataUrl}'}));
     let body=req.body;
     if(typeof body==='string'){ try{ body=JSON.parse(body||'{}'); }catch{ body={}; } }
     const imageDataUrl = body?.imageDataUrl;
-    if(!imageDataUrl) return res.status(400).json({error:'Missing imageDataUrl'});
+    if(!imageDataUrl) return res.status(400).end(JSON.stringify({error:'Missing imageDataUrl'}));
 
     const key=process.env.OPENAI_API_KEY;
     const model=process.env.OPENAI_MODEL||'gpt-4o-mini';
 
-    if(!key){
-      const morphology={bodyLenToHeight:1.62, bellyDepthRatio:0.55, hockAngleDeg:144, rumpSlope:0.07, toplineDeviation:0.07};
+    const safeDemo = ()=>{
+      const morphology={bodyLenToHeight:1.60, bellyDepthRatio:0.58, hockAngleDeg:145, rumpSlope:0.08, toplineDeviation:0.08};
       const bcs=3.0, bcs9=2*bcs-1;
-      const score=72, verdictBand='Bueno';
-      return res.status(200).json({source:'heuristic', morphology, bcs, bcs9, score, verdictBand, explanation:'Sin llave OpenAI: demo heurístico.'});
+      const score=70, verdictBand='Regular';
+      return {source:'heuristic', morphology, bcs, bcs9, score, verdictBand, explanation:'Demo heurístico (sin llave o error OpenAI).'};
+    };
+
+    if(!key){
+      return res.status(200).end(JSON.stringify(safeDemo()));
     }
 
-    const sys = "Eres evaluador morfológico de bovinos para engorde. Devuelve SOLO JSON.";
-    const userText = {type:'text', text:`Extrae desde la IMAGEN: 
+    let out;
+    try{
+      const sys = "Eres evaluador morfológico de bovinos para engorde. Devuelve SOLO JSON.";
+      const userText = {type:'text', text:`Extrae desde la IMAGEN: 
 - bcs5 (1–5), bcs9 (1–9)
 - morphology { bodyLenToHeight, bellyDepthRatio, hockAngleDeg, rumpSlope, toplineDeviation }
 - sex, categoryGuess, ageGuessMonths, weightGuessKg
 Si algo no es fiable, usa null. SOLO JSON.`};
-    const content=[ userText, {type:'image_url', image_url:{url:imageDataUrl, detail:'high'}} ];
-    let out = await openaiJSON(key, model, [
-      {role:'system', content: sys},
-      {role:'user', content: content}
-    ]);
+      const content=[ userText, {type:'image_url', image_url:{url:imageDataUrl, detail:'high'}} ];
+      out = await openaiJSON(key, model, [
+        {role:'system', content: sys},
+        {role:'user', content: content}
+      ]);
+    }catch(e){
+      return res.status(200).end(JSON.stringify(safeDemo()));
+    }
 
     const m = out.morphology||{};
     const morph = {
       bodyLenToHeight: clamp(num(m.bodyLenToHeight)||1.58,1.05,2.3),
       bellyDepthRatio: clamp((num(m.bellyDepthRatio)>1 && num(m.bellyDepthRatio)<=100)? num(m.bellyDepthRatio)/100 : (num(m.bellyDepthRatio)||0.56), 0.25, 1.05),
       hockAngleDeg: clamp(num(m.hockAngleDeg)||145,110,180),
-      rumpSlope: clamp((Math.abs(num(m.rumpSlope))>1 && Math.abs(num(m.rumpSlope))<=40)? num(m.rumpSlope)/100 : (num(m.rumpSlope)||0.07), -0.35, 0.35),
-      toplineDeviation: clamp((num(m.toplineDeviation)>1 && num(m.toplineDeviation)<=60)? num(m.toplineDeviation)/100 : (num(m.toplineDeviation)||0.07), 0, 0.6)
+      rumpSlope: clamp((Math.abs(num(m.rumpSlope))>1 && Math.abs(num(m.rumpSlope))<=40)? num(m.rumpSlope)/100 : (num(m.rumpSlope)||0.08), -0.35, 0.35),
+      toplineDeviation: clamp((num(m.toplineDeviation)>1 && num(m.toplineDeviation)<=60)? num(m.toplineDeviation)/100 : (num(m.toplineDeviation)||0.08), 0, 0.6)
     };
 
     let bcs5 = num(out.bcs5), bcs9 = num(out.bcs9);
@@ -82,7 +92,7 @@ Si algo no es fiable, usa null. SOLO JSON.`};
     const score = Math.round(100 - Math.abs(morph.bodyLenToHeight-1.65)*40 - Math.abs(morph.hockAngleDeg-145)*0.5 - (morph.toplineDeviation*120));
     const verdictBand = score>=90? 'Excelente' : score>=72? 'Bueno' : score>=58? 'Regular' : score>=45? 'Malo' : 'Muy malo';
 
-    return res.status(200).json({
+    const payload = {
       source: 'openai',
       morphology: morph,
       bcs, bcs9,
@@ -93,10 +103,11 @@ Si algo no es fiable, usa null. SOLO JSON.`};
       score: Math.max(0,Math.min(100,score)),
       verdictBand,
       explanation: `BCS ${bcs?.toFixed?.(1)}; corvejón ~${Math.round(morph.hockAngleDeg)}°, dorso ${morph.toplineDeviation.toFixed(2)}.`
-    });
+    };
+    return res.status(200).end(JSON.stringify(payload));
   }catch(err){
     const msg = (err && err.message) ? err.message : String(err);
-    return res.status(500).json({error:'API error', detail: msg});
+    return res.status(500).end(JSON.stringify({error:'API error', detail: msg}));
   }
 };
 module.exports.config = { runtime:'nodejs' };

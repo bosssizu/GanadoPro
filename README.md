@@ -1,10 +1,9 @@
-# GanadoPro v45 (Vercel-ready)
-Estructura lista para desplegar en Vercel:
-- `public/index.html` (UI móvil/desktop)
-- `api/health.js` y `api/analyze.js` (CommonJS, runtime nodejs, JSON-only)
-- `package.json` y `vercel.json`
+# GanadoPro v48 (Clean Build)
+- UI avanzada (sub-scores, precauciones, resumen IA, finanzas y compra).
+- API estable (JSON-only) con fallback heurístico si no hay `OPENAI_API_KEY`.
+- `package.json` y `vercel.json` mínimos para Vercel.
 
 ## Deploy
-1) Conecta el repo a Vercel.
+1) Sube a un repo y conéctalo en Vercel.
 2) Variables: `OPENAI_API_KEY` (y opcional `OPENAI_MODEL`, ej. `gpt-4o-mini`).
-3) Sin build step. Verifica `/api/health` y luego prueba el flujo en `/`.
+3) Verifica `/api/health` y luego prueba la app.
