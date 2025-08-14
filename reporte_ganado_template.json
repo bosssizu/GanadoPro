@@ -1,0 +1,33 @@
+{
+    "veredicto": "",
+    "puntaje": null,
+    "BCS": {
+        "valor": null,
+        "escala": "1–9"
+    },
+    "sexo_categoria": "",
+    "edad_peso_estimado": {
+        "edad_meses": null,
+        "peso_kg": null
+    },
+    "morfologia": {
+        "relacion_largo_alto": null,
+        "profundidad_abdominal": null,
+        "angulo_corvejon": null,
+        "desviacion_linea_dorsal": null,
+        "pendiente_grupa": null
+    },
+    "evaluacion_por_areas": {
+        "BCS": null,
+        "locomocion": null,
+        "dorso": null,
+        "proporciones": null
+    },
+    "fortalezas": [],
+    "debilidades": [],
+    "resumen_tecnico": "",
+    "recomendacion_compra": {
+        "comprar": null,
+        "motivo": ""
+    }
+}
