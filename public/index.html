@@ -3,7 +3,7 @@
 <head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'>
-<title>GanadoPro • v57b (Engorde)</title>
+<title>GanadoPro • v58c (Engorde)</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -32,8 +32,6 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
 .band i{position:absolute;top:0;bottom:0;width:2px;background:#fff}
 .band .seg{position:absolute;top:0;bottom:0}
 .seg.good{background:#16a34a}
-.seg.mid{background:#f59e0b}
-.seg.bad{background:#ef4444}
 .tag{font-size:12px;color:#cbd5e1}
 </style>
 </head>
@@ -42,8 +40,8 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
   <header>
     <div class='logo'>GP</div>
     <div>
-      <div style='font-weight:800;font-size:20px'>GanadoPro • v57b</div>
-      <div class='small'>ENGORDE: métricas en español + bandas por métrica + texto robusto</div>
+      <div style='font-weight:800;font-size:20px'>GanadoPro • v58c</div>
+      <div class='small'>ENGORDE: doble validación + tipo racial estimado</div>
     </div>
     <div style='margin-left:auto;display:flex;gap:8px;align-items:center'>
       <span id='health' class='pill'>API: verificando…</span>
@@ -73,6 +71,7 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
           <b>Veredicto</b><span id='r_ver'>–</span>
           <b>Puntaje</b><span id='r_score'>–</span>
           <b>BCS</b><span id='r_bcs'>–</span>
+          <b>Tipo racial (estimado)</b><span id='r_breed'>–</span>
           <b>Sexo/Categoría</b><span id='r_sexcat'>–</span>
           <b>Edad/Peso est.</b><span id='r_agew'>–</span>
         </div>
@@ -129,9 +128,9 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
 <script>
 const $=s=>document.querySelector(s);
 const statusEl=$('#status'), fileEl=$('#file'), img=$('#preview'), imgWrap=$('#imgWrap'), diag=document.querySelector('#diag');
-const out={ver:$('#r_ver'),score:$('#r_score'),bcs:$('#r_bcs'),sexcat:$('#r_sexcat'),agew:$('#r_agew'),subs:$('#subs'),flags:$('#flags'),mainC:$('#mainC'),bar:$('#scoreBar'),rtext:$('#r_text'),bands:$('#bands')};
+const out={ver:$('#r_ver'),score:$('#r_score'),bcs:$('#r_bcs'),breed:$('#r_breed'),sexcat:$('#r_sexcat'),agew:$('#r_agew'),subs:$('#subs'),flags:$('#flags'),mainC:$('#mainC'),bar:$('#scoreBar'),rtext:$('#r_text'),bands:$('#bands')};
 const strengthsEl=$('#s_strengths'), weaknessesEl=$('#s_weak'); const buy={dec:$('#buy_dec'),rng:$('#buy_rng'),note:$('#buy_note')};
-function log(x){ if(diag) diag.textContent+=(diag.textContent?'\n':'')+x; }
+function log(x){ if(diag) diag.textContent+=(diag.textContent?'\\n':'')+x; }
 async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); document.querySelector('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave (demo)'; }catch{ document.querySelector('#health').textContent='API: error'; } }
 async function fileToDataURL(file){ const fr=new FileReader(); return await new Promise((res,rej)=>{ fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 async function compress(file,maxSide=1100,q=0.78){ const url=await fileToDataURL(file); const im=new Image(); im.src=url; await new Promise((res,rej)=>{im.onload=res;im.onerror=rej}); const sc=Math.min(1,maxSide/Math.max(im.naturalWidth,im.naturalHeight)); const w=Math.round(im.naturalWidth*sc),h=Math.round(im.naturalHeight*sc); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(im,0,0,w,h); let out=c.toDataURL('image/jpeg',q); if(out.length>3_500_000){ const blob=await (await fetch(out)).blob(); return await compress(new File([blob],'img.jpg'),900,0.72);} return out; }
@@ -167,6 +166,7 @@ function render(j){
   out.ver.textContent=(j.verdictBand||'—');
   out.score.textContent=(j.score??'—');
   out.bcs.textContent=(j.bcs??'—')+(j.bcs9?(' / '+j.bcs9+' (1–9)'):''); 
+  out.breed.textContent = (j.breedGuess && j.breedGuess.length) ? j.breedGuess.map(b=>`${b.breed}${b.pct?' '+b.pct+'%':''}`).join(', ') : '—';
   out.sexcat.textContent=[j.sex,j.categoryGuess].filter(Boolean).join(' • ')||'—';
   out.agew.textContent=[j.ageGuessMonths?j.ageGuessMonths+' m':'', j.weightGuessKg?j.weightGuessKg+' kg':''].filter(Boolean).join(' • ')||'—';
   out.bands.innerHTML='';
