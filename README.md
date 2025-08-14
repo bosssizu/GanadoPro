@@ -1,12 +1,12 @@
-# GanadoPro v58c (ES) — Vercel
-- Doble validación de métricas (2 pases + fusión) y tipo racial estimado.
-- UI en español, bandas por métrica, fortalezas/debilidades, resumen IA y decisión de compra.
-- Listo para Vercel. No fija runtime explícito.
+# GanadoPro v58f (ES) — Vercel
+- Doble validación (2 pasadas) + **gating estricto**: bloquea “Bueno/Excelente” si **BCS < 2.8** o hay **≥3 métricas “Malo”**.
+- Debilidades siempre presentes; resumen IA en español; tipo racial estimado.
+- UI móvil-first con bandas por métrica.
+- Listo para Vercel (rutas en `vercel.json`).
 
-## Deploy rápido
-1) Suba este zip a un repo o impórtelo directo en Vercel.
-2) Deploy. La raíz sirve `public/index.html`; la API está en `/api`.
-3) Pruebe `/api/health` (JSON).
-4) Abra la app, cargue una imagen y vea el informe.
+## Deploy
+1) Importa el ZIP en Vercel o súbelo a un repo y conéctalo.
+2) Abre `/api/health` (JSON).
+3) Carga una imagen en `/`.
 
-> Nota: `api/analyze.js` usa una heurística determinista (demo). Para IA real, reemplace la lógica por su llamada a modelo y agregue `OPENAI_API_KEY` en Vercel.
+> Nota: `api/analyze.js` es heurístico (demo). Para IA real, sustituye la lógica por tu llamada de modelo y fija `OPENAI_API_KEY`.

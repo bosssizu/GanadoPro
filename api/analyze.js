@@ -25,16 +25,16 @@ function metricGrades(m, adjust){
 }
 function estimateBCS5({bellyDepthRatio,toplineDeviation,hockAngleDeg}){
   let base=3.0;
-  if(Number.isFinite(bellyDepthRatio)){ if(bellyDepthRatio<0.50) base-=0.7; else if(bellyDepthRatio>=0.58 && bellyDepthRatio<=0.72) base+=0.3; }
-  if(Number.isFinite(toplineDeviation)){ if(toplineDeviation>0.16) base-=0.6; else if(toplineDeviation<=0.06) base+=0.2; }
-  if(Number.isFinite(hockAngleDeg)&&hockAngleDeg<118) base-=0.3;
+  if(Number.isFinite(bellyDepthRatio)){ if(bellyDepthRatio<0.50) base-=0.9; else if(bellyDepthRatio>=0.58 && bellyDepthRatio<=0.72) base+=0.3; }
+  if(Number.isFinite(toplineDeviation)){ if(toplineDeviation>0.16) base-=0.7; else if(toplineDeviation<=0.06) base+=0.2; }
+  if(Number.isFinite(hockAngleDeg)&&hockAngleDeg<118) base-=0.4;
   return Math.min(5,Math.max(1,+base.toFixed(1)));
 }
 function morphFromSeed(seed){
   return {
     bodyLenToHeight: Math.min(2.1,Math.max(1.1, +(1.50 + (seed%18)/100).toFixed(2))),
     bellyDepthRatio: Math.min(0.9,Math.max(0.35, +(0.50 + ((seed>>3)%20)/100).toFixed(2))),
-    hockAngleDeg: Math.min(170,Math.max(112, 136 + ((seed>>5)%24))), // 136–160
+    hockAngleDeg: Math.min(170,Math.max(112, 136 + ((seed>>5)%24))), 
     toplineDeviation: Math.min(0.3,Math.max(0, +(0.03 + ((seed>>7)%11)/100).toFixed(2))),
     rumpSlope: Math.min(0.3,Math.max(-0.1, +(0.00 + ((seed>>9)%18)/100).toFixed(2)))
   };
@@ -50,7 +50,7 @@ function fuseMorph(m1,m2){
   const tol = {bodyLenToHeight:0.08, bellyDepthRatio:0.06, hockAngleDeg:6, toplineDeviation:0.04, rumpSlope:0.05};
   const fused={};
   for(const k of Object.keys(d)){
-    fused[k] = (d[k] <= tol[k]) ? (m1[k]+m2[k])/2 : (0.6*m1[k]+0.4*m2[k]); // pondera el 1er pase si difieren
+    fused[k] = (d[k] <= tol[k]) ? (m1[k]+m2[k])/2 : (0.6*m1[k]+0.4*m2[k]);
   }
   return {m:fused, drift: d};
 }
@@ -80,27 +80,18 @@ module.exports = async (req,res)=>{
     let body=req.body; if(typeof body==='string'){ try{ body=JSON.parse(body||'{}'); }catch{ body={}; } }
     const imageDataUrl=body?.imageDataUrl; if(!imageDataUrl) return res.status(400).end(JSON.stringify({error:'Falta imageDataUrl'}));
 
-    // Pase 1
     const crypto = require('crypto');
-    const h1 = crypto.createHash('md5').update(imageDataUrl).digest('hex');
-    const seed1 = parseInt(h1.slice(0,8),16);
+    const seed1 = parseInt(crypto.createHash('md5').update(imageDataUrl).digest('hex').slice(0,8),16);
+    const seed2 = parseInt(crypto.createHash('md5').update(imageDataUrl+'::pass2').digest('hex').slice(0,8),16);
     const m1 = morphFromSeed(seed1);
-
-    // Pase 2 (semilla distinta)
-    const h2 = crypto.createHash('md5').update(imageDataUrl+'::pass2').digest('hex');
-    const seed2 = parseInt(h2.slice(0,8),16);
     const m2 = morphFromSeed(seed2);
-
-    // Fusión
     const fused = fuseMorph(m1,m2);
     const m = fused.m;
 
-    // Raza (estimada) y ajuste de rangos
     const breed = breedGuess(m);
     const adjFn = (base)=>adjustByBreed(base, breed[0]?.breed);
     const grades = metricGrades(m, adjFn);
 
-    // BCS y score
     let bcs = estimateBCS5(m);
     const bcs9 = +(2*bcs-1).toFixed(1);
 
@@ -108,10 +99,18 @@ module.exports = async (req,res)=>{
     const fTop  = 1 - Math.min(1, (m.toplineDeviation)/0.18);
     const fHoc  = 1 - Math.min(1, Math.abs(m.hockAngleDeg-146)/24);
     const fBcs  = Math.min(1, Math.max(0, (bcs9-3)/6));
-    let score = Math.round(100*(0.30*fProp + 0.30*fTop + 0.26*fHoc + 0.14*fBcs));
+    let score = Math.round(100*(0.28*fProp + 0.30*fTop + 0.26*fHoc + 0.16*fBcs));
     score = Math.min(100,Math.max(0,score));
 
-    const verdictBand = score>=90?'Excelente': score>=72?'Bueno': score>=58?'Regular': score>=45?'Malo':'Muy malo';
+    const badCount = Object.values(grades).filter(g=>g.band==='Malo').length;
+
+    let verdictBand = score>=90?'Excelente': score>=72?'Bueno': score>=58?'Regular': score>=45?'Malo':'Muy malo';
+
+    const gating = (bcs < 2.8) || (badCount >= 3);
+    if(gating){
+      verdictBand = (bcs < 2.4 or badCount >= 4) ? 'Muy malo' : 'Malo';
+      if(score>57) score = 54;
+    }
 
     const strengths=[]; const weaknesses=[];
     if(m.toplineDeviation<=0.06) strengths.push('Línea dorsal recta/estable');
@@ -121,17 +120,17 @@ module.exports = async (req,res)=>{
     if(m.hockAngleDeg<118) weaknesses.push('Corvejón cerrado (riesgo locomotor)');
     if(m.toplineDeviation>0.18) weaknesses.push('Dorso cóncavo (posible menor eficiencia)');
     if(m.bellyDepthRatio>0.75) weaknesses.push('Abdomen muy profundo (puede bajar conversión)');
+    if(bcs<2.8) weaknesses.push('BCS bajo (condición delgada, lenta conversión inicial)');
+    if(!weaknesses.length) weaknesses.push('Revisión manual recomendada: no se detectaron debilidades obvias.');
 
     const explanation = `Tipo racial estimado: ${breed[0].breed}. `+
       `Proporciones ${m.bodyLenToHeight>=1.58?'favorables':'aceptables'}; `+
       `abdomen ${(m.bellyDepthRatio>=0.58 && m.bellyDepthRatio<=0.72)?'con buena capacidad':'algo justo'}; `+
       `dorsal ${(m.toplineDeviation<=0.06)?'recta':'con desviación leve'}; `+
-      `corvejón ~${m.hockAngleDeg}°. BCS ${bcs.toFixed(1)} (1–5).`;
+      `corvejón ~${m.hockAngleDeg}°. BCS ${bcs.toFixed(1)} (1–5). Métricas en “Malo”: ${badCount}.`;
 
-    // Decisión y rango de precio
     let decision='COMPRAR', note='—';
-    const KO = (m.hockAngleDeg < 118) || (m.toplineDeviation > 0.22) || (bcs9 <= 3.0);
-    if(KO || verdictBand==='Muy malo' || verdictBand==='Malo'){
+    if(verdictBand==='Muy malo' || verdictBand==='Malo'){
       decision='NO COMPRAR'; note='Estructura/condición no apta para engorde eficiente.';
     } else if(verdictBand==='Regular'){
       decision='COMPRAR (conservador)'; note='Oferta en tramo bajo del rango local.';
@@ -147,8 +146,8 @@ module.exports = async (req,res)=>{
     recMax=Math.min(recMax,1800);
 
     res.status(200).end(JSON.stringify({
-      source:'heuristic+dualpass',
-      morphology:m, metricGrades:grades,
+      source:'heuristic+dualpass+gating',
+      morphology:m, metricGrades:grades, badCount,
       bcs, bcs9, score, verdictBand,
       strengths, weaknesses, explanation,
       decision, priceMinCRCkg:recMin, priceMaxCRCkg:recMax, note,
