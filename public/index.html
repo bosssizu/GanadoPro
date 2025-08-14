@@ -3,7 +3,7 @@
 <head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>GanadoPro • v52 (ES forzado)</title>
+<title>GanadoPro • v53 (ES)</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -18,15 +18,23 @@ header{display:flex;align-items:center;gap:10px}
 .grid{display:grid;gap:12px}
 .kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#0b1325;font-size:12px;color:#cbd5e1}
-.ok{background:rgba(16,185,129,.15);border-color:#065f46;color:#a7f3d0}
-.warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}
-.bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
+.badge.ok{background:rgba(16,185,129,.15);border-color:#065f46;color:#a7f3d0}
+.badge.warn{background:rgba(245,158,11,.15);border-color:#92400e;color:#fde68a}
+.badge.bad{background:rgba(239,68,68,.15);border-color:#7f1d1d;color:#fecaca}
 .bar{height:12px;background:#111827;border-radius:999px;overflow:hidden}.bar>i{display:block;height:12px;width:0;background:#22c55e;border-radius:999px}
 .preview{max-width:100%;border-radius:12px;border:1px solid var(--line)}
 pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);padding:8px;border-radius:8px;color:#9ca3af;max-height:220px;overflow:auto}
 .list{margin:6px 0 0 18px}
 @media (max-width:900px){.row{grid-template-columns:1fr}.btn.block{width:100%}}
 .small{font-size:12px;color:#9ca3af}
+.metric{display:grid;grid-template-columns:160px 1fr 130px;gap:8px;align-items:center;margin-bottom:10px}
+.band{height:12px;background:#111827;border-radius:8px;position:relative;overflow:hidden}
+.band i{position:absolute;top:0;bottom:0;width:2px;background:#fff}
+.band .seg{position:absolute;top:0;bottom:0}
+.seg.good{background:#16a34a}
+.seg.mid{background:#f59e0b}
+.seg.bad{background:#ef4444}
+.tag{font-size:12px;color:#cbd5e1}
 </style>
 </head>
 <body>
@@ -34,8 +42,8 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
   <header>
     <div class='logo'>GP</div>
     <div>
-      <div style='font-weight:800;font-size:20px'>GanadoPro • v52</div>
-      <div class='small'>ES forzado: análisis morfológico + BCS + explicación + compra/no compra</div>
+      <div style='font-weight:800;font-size:20px'>GanadoPro • v53</div>
+      <div class='small'>Bandas por métrica + fortalezas/debilidades robustas + resumen IA</div>
     </div>
     <div style='margin-left:auto;display:flex;gap:8px;align-items:center'>
       <span id='health' class='pill'>API: verificando…</span>
@@ -69,15 +77,14 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
           <b>Edad/Peso est.</b><span id='r_agew'>–</span>
         </div>
 
-        <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px'>
-          <div class='card'>
-            <div style='font-weight:600;margin-bottom:6px'>Morfología</div>
-            <div class='kv' id='morph'></div>
-          </div>
-          <div class='card'>
-            <div style='font-weight:600;margin-bottom:6px'>Sub-scores</div>
-            <div class='kv' id='subs'></div>
-          </div>
+        <div class='card' style='margin-top:10px'>
+          <div style='font-weight:600;margin-bottom:6px'>Morfología (rango con criterio)</div>
+          <div id='bands'></div>
+        </div>
+
+        <div class='card' style='margin-top:10px'>
+          <div style='font-weight:600;margin-bottom:6px'>Sub-scores</div>
+          <div class='kv' id='subs'></div>
         </div>
 
         <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px'>
@@ -122,26 +129,27 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
 <script>
 const $=s=>document.querySelector(s); const nf=new Intl.NumberFormat('es-CR');
 const statusEl=$('#status'), fileEl=$('#file'), img=$('#preview'), imgWrap=$('#imgWrap'), diag=$('#diag');
-const out={ver:$('#r_ver'),score:$('#r_score'),bcs:$('#r_bcs'),sexcat:$('#r_sexcat'),agew:$('#r_agew'),morph:$('#morph'),subs:$('#subs'),mainC:$('#mainC'),flags:$('#flags'),bar:$('#scoreBar'),rtext:$('#r_text')};
+const out={ver:$('#r_ver'),score:$('#r_score'),bcs:$('#r_bcs'),sexcat:$('#r_sexcat'),agew:$('#r_agew'),subs:$('#subs'),flags:$('#flags'),mainC:$('#mainC'),bar:$('#scoreBar'),rtext:$('#r_text'),bands:$('#bands')};
 const strengthsEl=$('#s_strengths'), weaknessesEl=$('#s_weak'); const buy={dec:$('#buy_dec'),rng:$('#buy_rng'),note:$('#buy_note')};
-function log(x){ diag.textContent+=(diag.textContent?'\n':'')+x; }
-async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); $('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave'; }catch{ $('#health').textContent='API: error'; } }
+function log(x){ diag.textContent+=(diag.textContent?'\\n':'')+x; }
+async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); $('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave (demo)'; }catch{ $('#health').textContent='API: error'; } }
 async function fileToDataURL(file){ const fr=new FileReader(); return await new Promise((res,rej)=>{ fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 async function compress(file,maxSide=1100,q=0.78){ const url=await fileToDataURL(file); const im=new Image(); im.src=url; await new Promise((res,rej)=>{im.onload=res;im.onerror=rej}); const sc=Math.min(1,maxSide/Math.max(im.naturalWidth,im.naturalHeight)); const w=Math.round(im.naturalWidth*sc),h=Math.round(im.naturalHeight*sc); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(im,0,0,w,h); let out=c.toDataURL('image/jpeg',q); if(out.length>3_500_000){ const blob=await (await fetch(out)).blob(); return await compress(new File([blob],'img.jpg'),900,0.72);} return out; }
 
-function es(s){ return String(s||'')
- .replace(/Good body length/ig,'Buen largo corporal')
- .replace(/Balanced belly depth/ig,'Profundidad abdominal equilibrada')
- .replace(/Moderate hock angle/ig,'Ángulo de corvejón moderado')
- .replace(/Slight topline deviation/ig,'Ligera desviación de línea dorsal')
- .replace(/healthy appearance/ig,'Apariencia saludable')
- .replace(/^The animal shows/,'El animal presenta')
- .replace(/good overall health/,'buena condición general')
- .replace(/good balance in body length and height/,'buen equilibrio entre longitud corporal y alzada')
- .replace(/However, the hock angle could be improved for better mobility\./,'Sin embargo, el ángulo de corvejón podría mejorar para una mejor movilidad.');
+function tagClass(b){ return b==='Bueno'||b==='Excelente'?'ok': b==='Regular'?'warn':'bad'; }
+function bandRow(k, g){
+  const pretty = {bodyLenToHeight:'Largo/Alzada', bellyDepthRatio:'Prof. abdomen/Alzada', hockAngleDeg:'Ángulo corvejón (°)', toplineDeviation:'Desv. de dorso', rumpSlope:'Pendiente de grupa'}[k] || k;
+  const band = document.createElement('div'); band.className='metric';
+  const name = document.createElement('div'); name.textContent=pretty; band.appendChild(name);
+  const bar = document.createElement('div'); bar.className='band';
+  const segG=document.createElement('span'); segG.className='seg good'; segG.style.left=(g.goodMinPos*100)+'%'; segG.style.width=((g.goodMaxPos-g.goodMinPos)*100)+'%'; bar.appendChild(segG);
+  const cursor=document.createElement('i'); cursor.style.left=(g.pos*100)+'%'; bar.appendChild(cursor);
+  band.appendChild(bar);
+  const t=document.createElement('span'); t.className='tag badge '+tagClass(g.band); t.textContent=g.band + ' • ' + (g.value ?? '—'); band.appendChild(t);
+  return band;
 }
+$('#reset').onclick=()=>{ img.src=''; imgWrap.style.display='none'; $('#report').style.display='none'; buy.dec.textContent='–'; buy.rng.textContent='–'; buy.note.textContent='—'; statusEl.textContent='Listo'; $('#diag').textContent=''; out.bands.innerHTML=''; };
 
-$('#reset').onclick=()=>{ img.src=''; imgWrap.style.display='none'; $('#report').style.display='none'; buy.dec.textContent='–'; buy.rng.textContent='–'; buy.note.textContent='—'; statusEl.textContent='Listo'; $('#diag').textContent=''; };
 $('#analyze').onclick=async()=>{
   try{
     if(!fileEl.files.length) return alert('Selecciona una imagen');
@@ -163,7 +171,9 @@ function render(j){
   out.bcs.textContent=(j.bcs??'—')+(j.bcs9?(' / '+j.bcs9+' (1–9)'):''); 
   out.sexcat.textContent=[j.sex,j.categoryGuess].filter(Boolean).join(' • ')||'—';
   out.agew.textContent=[j.ageGuessMonths?j.ageGuessMonths+' m':'', j.weightGuessKg?j.weightGuessKg+' kg':''].filter(Boolean).join(' • ')||'—';
-  out.morph.innerHTML = ['bodyLenToHeight','bellyDepthRatio','hockAngleDeg','toplineDeviation','rumpSlope'].map(k=>`<b>${k}</b><span>${m[k]??'—'}</span>`).join('');
+
+  out.bands.innerHTML='';
+  if (j.metricGrades){ Object.keys(j.metricGrades).forEach(k=> out.bands.appendChild(bandRow(k, j.metricGrades[k])) ); }
 
   const sbcs = Math.round((Math.max(1,Math.min(5, j.bcs||3))-1)/4*100);
   const sloco = Math.round((1 - Math.abs((m.hockAngleDeg||145)-145)/35)*100);
@@ -181,9 +191,9 @@ function render(j){
 
   const sc = Math.max(0,Math.min(100, j.score||0)); out.bar.style.width = sc+'%'; out.bar.style.background = sc>=72? '#22c55e' : sc>=58? '#f59e0b' : '#ef4444';
 
-  strengthsEl.innerHTML = (j.strengths||[]).map(t=>`<li>${es(t)}</li>`).join('') || '<li>—</li>';
-  weaknessesEl.innerHTML = (j.weaknesses||[]).map(t=>`<li>${es(t)}</li>`).join('') || '<li>—</li>';
-  out.rtext.textContent = es(j.explanation || '—');
+  strengthsEl.innerHTML = (j.strengths||[]).map(t=>`<li>${t}</li>`).join('') || '<li>—</li>';
+  weaknessesEl.innerHTML = (j.weaknesses||[]).map(t=>`<li>${t}</li>`).join('') || '<li>—</li>';
+  out.rtext.textContent = j.explanation || '—';
 
   const v=(j.verdictBand||'').toLowerCase();
   const base=[1400,1650];
@@ -192,7 +202,6 @@ function render(j){
   else if(v.includes('regular')){ adj=[0.9,1.0]; buy.dec.textContent='COMPRAR (conservador)'; buy.dec.className='badge warn'; buy.note.textContent='Oferta en tramo bajo del rango local.'; }
   else if(v.includes('bueno')){ adj=[1.0,1.12]; buy.dec.textContent='COMPRAR'; buy.dec.className='badge ok'; buy.note.textContent='Se admite algo sobre promedio.'; }
   else if(v.includes('excelente')){ adj=[1.05,1.20]; buy.dec.textContent='COMPRAR'; buy.dec.className='badge ok'; buy.note.textContent='Rango alto sin llegar al tope.'; }
-
   let recMin=Math.round(base[0]*adj[0]), recMax=Math.round(base[1]*adj[1]); recMax=Math.min(recMax,1800);
   buy.rng.textContent=new Intl.NumberFormat('es-CR').format(recMin)+' – '+new Intl.NumberFormat('es-CR').format(recMax)+' CRC/kg';
 }

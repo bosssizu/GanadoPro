@@ -1,8 +1,11 @@
 {
-  "name": "ganadopro-v52-es-forzado",
+  "name": "ganadopro-v53-es",
   "version": "1.0.0",
   "private": true,
-  "description": "GanadoPro AI v52 (ES forzado): análisis + compra/no compra + traducción garantizada",
-  "scripts": { "build": "echo \"No build step\"", "start": "echo \"Use vercel dev\"" },
-  "engines": { "node": ">=18.x" }
+  "scripts": {
+    "start": "serve public -l 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
 }
