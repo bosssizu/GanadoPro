@@ -1,7 +1,8 @@
 {
-  "name": "ganadopro-v53-es",
+  "name": "ganadopro-v54-es-engorde",
   "version": "1.0.0",
   "private": true,
+  "description": "GanadoPro v54 (ES): m\u00e9tricas traducidas, bandas por m\u00e9trica, texto robusto y compra/no compra para engorde.",
   "scripts": {
     "start": "serve public -l 3000"
   },

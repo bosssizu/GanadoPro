@@ -3,7 +3,7 @@
 <head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>GanadoPro • v53 (ES)</title>
+<title>GanadoPro • v54 (Engorde)</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -27,7 +27,7 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
 .list{margin:6px 0 0 18px}
 @media (max-width:900px){.row{grid-template-columns:1fr}.btn.block{width:100%}}
 .small{font-size:12px;color:#9ca3af}
-.metric{display:grid;grid-template-columns:160px 1fr 130px;gap:8px;align-items:center;margin-bottom:10px}
+.metric{display:grid;grid-template-columns:190px 1fr 140px;gap:8px;align-items:center;margin-bottom:10px}
 .band{height:12px;background:#111827;border-radius:8px;position:relative;overflow:hidden}
 .band i{position:absolute;top:0;bottom:0;width:2px;background:#fff}
 .band .seg{position:absolute;top:0;bottom:0}
@@ -42,8 +42,8 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
   <header>
     <div class='logo'>GP</div>
     <div>
-      <div style='font-weight:800;font-size:20px'>GanadoPro • v53</div>
-      <div class='small'>Bandas por métrica + fortalezas/debilidades robustas + resumen IA</div>
+      <div style='font-weight:800;font-size:20px'>GanadoPro • v54</div>
+      <div class='small'>Bovinos para ENGORDE: métricas en español + bandas por métrica + texto robusto</div>
     </div>
     <div style='margin-left:auto;display:flex;gap:8px;align-items:center'>
       <span id='health' class='pill'>API: verificando…</span>
@@ -78,7 +78,7 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
         </div>
 
         <div class='card' style='margin-top:10px'>
-          <div style='font-weight:600;margin-bottom:6px'>Morfología (rango con criterio)</div>
+          <div style='font-weight:600;margin-bottom:6px'>Morfología (rango con criterio para ENGORDE)</div>
           <div id='bands'></div>
         </div>
 
@@ -97,7 +97,7 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
           </div>
         </div>
 
-        <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px'>
+        <div style='display/grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px'>
           <div>
             <div style='font-weight:600;margin-bottom:6px'>Fortalezas</div>
             <ul id='s_strengths' class='list'></ul>
@@ -138,7 +138,7 @@ async function compress(file,maxSide=1100,q=0.78){ const url=await fileToDataURL
 
 function tagClass(b){ return b==='Bueno'||b==='Excelente'?'ok': b==='Regular'?'warn':'bad'; }
 function bandRow(k, g){
-  const pretty = {bodyLenToHeight:'Largo/Alzada', bellyDepthRatio:'Prof. abdomen/Alzada', hockAngleDeg:'Ángulo corvejón (°)', toplineDeviation:'Desv. de dorso', rumpSlope:'Pendiente de grupa'}[k] || k;
+  const pretty = {bodyLenToHeight:'Relación largo–alto', bellyDepthRatio:'Relación profundidad de abdomen', hockAngleDeg:'Ángulo del corvejón (°)', toplineDeviation:'Desviación de línea dorsal', rumpSlope:'Pendiente de grupa'}[k] || k;
   const band = document.createElement('div'); band.className='metric';
   const name = document.createElement('div'); name.textContent=pretty; band.appendChild(name);
   const bar = document.createElement('div'); bar.className='band';
