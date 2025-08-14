@@ -1,8 +1,14 @@
 {
-  "name": "ganadopro-v39-4-1-safe",
+  "name": "ganadopro-ai-v45",
+  "version": "1.0.0",
   "private": true,
+  "description": "GanadoPro AI (frontend estático + serverless API en Vercel)",
   "scripts": {
-    "dev": "vercel dev",
-    "start": "vercel dev"
-  }
+    "build": "echo \"No build step\"",
+    "start": "echo \"Use vercel dev\""
+  },
+  "engines": {
+    "node": ">=18.x"
+  },
+  "license": "MIT"
 }
