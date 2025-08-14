@@ -1,1 +1,1 @@
-GanadoPro v50 - Solo análisis (BCS calibrado + morfología + explicación). Deploy on Vercel.
+GanadoPro v51 (ES completo): análisis + compra/no compra + rango CRC/kg. Deploy en Vercel.

@@ -1,8 +1,8 @@
 {
-  "name": "ganadopro-analysis-only-v50",
+  "name": "ganadopro-v51-es-completo",
   "version": "1.0.0",
   "private": true,
-  "description": "GanadoPro AI v50 - Solo análisis (BCS calibrado + morfología + explicación)",
+  "description": "GanadoPro AI v51 (ES) - Análisis + compra/no compra + rango CRC/kg",
   "scripts": { "build": "echo \"No build step\"", "start": "echo \"Use vercel dev\"" },
   "engines": { "node": ">=18.x" }
 }

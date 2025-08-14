@@ -74,7 +74,6 @@ module.exports=async(req,res)=>{
 - bcs9 (1–9) y bcs5 (1–5)
 - morphology { bodyLenToHeight, bellyDepthRatio, hockAngleDeg, rumpSlope, toplineDeviation }
 - sex, categoryGuess, ageGuessMonths, weightGuessKg
-- observations { condition[], structure[], risks[] }
 - strengths[], weaknesses[], explanation (1–2 frases)
 Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAngleDeg 130–160; toplineDeviation 0.00–0.20; rumpSlope -0.10–0.25.`};
       const content=[user,{type:'image_url',image_url:{url:imageDataUrl,detail:'high'}}];
@@ -96,19 +95,28 @@ Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAn
     if(!Number.isFinite(bcs5) && Number.isFinite(bcs9)) bcs5=0.5*bcs9+0.5;
     if(!Number.isFinite(bcs9) && Number.isFinite(bcs5)) bcs9=2*bcs5-1;
     if(!Number.isFinite(bcs5)) bcs5=estimateBCS5(morph);
-    // calibración cebuina
-    const goodTop=(morph.toplineDeviation??0.08)<=0.10, goodHock=(morph.hockAngleDeg??145)>=135, okBelly=(morph.bellyDepthRatio??0.56)>=0.48 && (morph.bellyDepthRatio??0.56)<=0.70;
-    if((bcs9??(2*bcs5-1))<=4.5 && goodTop && goodHock && okBelly){ bcs9=Math.max(5.2, Math.min(6.2, (bcs9??(2*bcs5-1))+1.5)); }
+    const sweetTop=(morph.toplineDeviation??0.08)<=0.10, sweetHock=(morph.hockAngleDeg??145)>=135, sweetBelly=(morph.bellyDepthRatio??0.56)>=0.48 && (morph.bellyDepthRatio??0.56)<=0.70;
+    if((bcs9??(2*bcs5-1))<=4.5 && sweetTop && sweetHock && sweetBelly){ bcs9=Math.max(5.2, Math.min(6.2, (bcs9??(2*bcs5-1))+1.5)); }
     if(!Number.isFinite(bcs9)) bcs9=+(2*bcs5-1).toFixed(1);
     bcs5=+(0.5*bcs9+0.5).toFixed(1);
 
-    // score priorizando morfología sobre grasa
+    // Score (morfología > grasa)
     const sProp=1 - Math.min(1, Math.abs((morph.bodyLenToHeight ?? 1.6) - 1.6) / 0.5);
     const sTop =1 - Math.min(1, (morph.toplineDeviation ?? 0) / 0.22);
     const sHock=1 - Math.min(1, Math.abs((morph.hockAngleDeg ?? 145) - 145) / 30);
     const sBCS =Math.min(1, Math.max(0, (bcs9 - 3) / 6));
     const score=Math.round(100*(0.34*sProp + 0.28*sTop + 0.20*sHock + 0.18*sBCS));
     const verdictBand= score>=90? 'Excelente' : score>=72? 'Bueno' : score>=58? 'Regular' : score>=45? 'Malo' : 'Muy malo';
+
+    // Decisión + rango CRC/kg con tope ~1800
+    let decision='COMPRAR', rng=[1400,1650], adj=[1,1], note='—';
+    const v = verdictBand.toLowerCase();
+    if(v.includes('muy malo')||v.includes('malo')){ decision='NO COMPRAR'; rng=null; note='Descartado por veredicto/flags.'; }
+    else if(v.includes('regular')){ adj=[0.9,1.0]; note='Conservador: tramo bajo del rango.'; }
+    else if(v.includes('bueno')){ adj=[1.0,1.12]; note='Puede pagarse algo sobre promedio.'; }
+    else if(v.includes('excelente')){ adj=[1.05,1.20]; note='Rango alto sin llegar a tope.'; }
+    let priceMin=null, priceMax=null;
+    if(rng){ priceMin=Math.round(rng[0]*adj[0]); priceMax=Math.round(rng[1]*adj[1]); priceMax=Math.min(priceMax,1800); }
 
     const payload={
       source:'openai',
@@ -119,13 +127,16 @@ Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAn
       categoryGuess:out.categoryGuess||null,
       ageGuessMonths:out.ageGuessMonths||null,
       weightGuessKg:out.weightGuessKg||null,
-      observations: out.observations || { condition:[], structure:[], risks:[] },
       strengths:Array.isArray(out.strengths)?out.strengths.slice(0,6):[],
       weaknesses:Array.isArray(out.weaknesses)?out.weaknesses.slice(0,6):[],
       score:Math.max(0,Math.min(100,score)),
       verdictBand,
       subs: subScores(morph,bcs5),
-      explanation: out.explanation || makeExplanation(morph,bcs9)
+      explanation: out.explanation || makeExplanation(morph,bcs9),
+      decision,
+      priceMinCRCkg: priceMin,
+      priceMaxCRCkg: priceMax,
+      note
     };
     return res.status(200).end(JSON.stringify(payload));
   }catch(err){
