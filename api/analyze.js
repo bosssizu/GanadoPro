@@ -108,7 +108,7 @@ module.exports = async (req,res)=>{
 
     const gating = (bcs < 2.8) || (badCount >= 3);
     if(gating){
-      verdictBand = (bcs < 2.4 or badCount >= 4) ? 'Muy malo' : 'Malo';
+      verdictBand = (bcs < 2.4 || badCount >= 4) ? 'Muy malo' : 'Malo';
       if(score>57) score = 54;
     }
 
@@ -156,6 +156,6 @@ module.exports = async (req,res)=>{
       drift:fused.drift
     }));
   }catch(e){
-    res.status(500).end(JSON.stringify({error:'API error', detail:String(e)}));
+    res.status(500).end(JSON.stringify({error:'API error', detail:String(e&&e.stack||e)}));
   }
 };

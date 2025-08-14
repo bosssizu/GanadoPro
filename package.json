@@ -1,8 +1,8 @@
 {
-  "name": "ganadopro-v58f-es-vercel",
+  "name": "ganadopro-v58g-es-vercel",
   "version": "1.0.0",
   "private": true,
-  "description": "GanadoPro v58f (ES): doble validaci\u00f3n, gating estricto por BCS/m\u00e9tricas y tipo racial estimado; listo para Vercel.",
+  "description": "GanadoPro v58g (ES): fix JSON bug; doble validaci\u00f3n, gating estricto y tipo racial estimado; listo para Vercel.",
   "scripts": {
     "start": "serve public -l 3000"
   },
