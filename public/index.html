@@ -3,7 +3,7 @@
 <head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>GanadoPro • v51 (Completo)</title>
+<title>GanadoPro • v52 (ES forzado)</title>
 <style>
 :root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
@@ -34,8 +34,8 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
   <header>
     <div class='logo'>GP</div>
     <div>
-      <div style='font-weight:800;font-size:20px'>GanadoPro • v51</div>
-      <div class='small'>Análisis morfológico + BCS (calibrado cebuino) + explicación humana + compra/no compra</div>
+      <div style='font-weight:800;font-size:20px'>GanadoPro • v52</div>
+      <div class='small'>ES forzado: análisis morfológico + BCS + explicación + compra/no compra</div>
     </div>
     <div style='margin-left:auto;display:flex;gap:8px;align-items:center'>
       <span id='health' class='pill'>API: verificando…</span>
@@ -128,6 +128,19 @@ function log(x){ diag.textContent+=(diag.textContent?'\n':'')+x; }
 async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); $('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave'; }catch{ $('#health').textContent='API: error'; } }
 async function fileToDataURL(file){ const fr=new FileReader(); return await new Promise((res,rej)=>{ fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 async function compress(file,maxSide=1100,q=0.78){ const url=await fileToDataURL(file); const im=new Image(); im.src=url; await new Promise((res,rej)=>{im.onload=res;im.onerror=rej}); const sc=Math.min(1,maxSide/Math.max(im.naturalWidth,im.naturalHeight)); const w=Math.round(im.naturalWidth*sc),h=Math.round(im.naturalHeight*sc); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(im,0,0,w,h); let out=c.toDataURL('image/jpeg',q); if(out.length>3_500_000){ const blob=await (await fetch(out)).blob(); return await compress(new File([blob],'img.jpg'),900,0.72);} return out; }
+
+function es(s){ return String(s||'')
+ .replace(/Good body length/ig,'Buen largo corporal')
+ .replace(/Balanced belly depth/ig,'Profundidad abdominal equilibrada')
+ .replace(/Moderate hock angle/ig,'Ángulo de corvejón moderado')
+ .replace(/Slight topline deviation/ig,'Ligera desviación de línea dorsal')
+ .replace(/healthy appearance/ig,'Apariencia saludable')
+ .replace(/^The animal shows/,'El animal presenta')
+ .replace(/good overall health/,'buena condición general')
+ .replace(/good balance in body length and height/,'buen equilibrio entre longitud corporal y alzada')
+ .replace(/However, the hock angle could be improved for better mobility\./,'Sin embargo, el ángulo de corvejón podría mejorar para una mejor movilidad.');
+}
+
 $('#reset').onclick=()=>{ img.src=''; imgWrap.style.display='none'; $('#report').style.display='none'; buy.dec.textContent='–'; buy.rng.textContent='–'; buy.note.textContent='—'; statusEl.textContent='Listo'; $('#diag').textContent=''; };
 $('#analyze').onclick=async()=>{
   try{
@@ -140,25 +153,24 @@ $('#analyze').onclick=async()=>{
     render(j);
   }catch(e){ statusEl.textContent='Error'; alert(e.message||e); }
 };
+
 function render(j){
   statusEl.textContent='Listo'; $('#report').style.display='block';
   const m=j.morphology||{};
 
   out.ver.textContent=(j.verdictBand||'—');
   out.score.textContent=(j.score??'—');
-  out.bcs.textContent=(j.bcs??'—')+(j.bcs9?(' / '+j.bcs9+' (1–9)'):''); // ambas escalas
+  out.bcs.textContent=(j.bcs??'—')+(j.bcs9?(' / '+j.bcs9+' (1–9)'):''); 
   out.sexcat.textContent=[j.sex,j.categoryGuess].filter(Boolean).join(' • ')||'—';
   out.agew.textContent=[j.ageGuessMonths?j.ageGuessMonths+' m':'', j.weightGuessKg?j.weightGuessKg+' kg':''].filter(Boolean).join(' • ')||'—';
   out.morph.innerHTML = ['bodyLenToHeight','bellyDepthRatio','hockAngleDeg','toplineDeviation','rumpSlope'].map(k=>`<b>${k}</b><span>${m[k]??'—'}</span>`).join('');
 
-  // Sub-scores
   const sbcs = Math.round((Math.max(1,Math.min(5, j.bcs||3))-1)/4*100);
   const sloco = Math.round((1 - Math.abs((m.hockAngleDeg||145)-145)/35)*100);
   const stopl = Math.round((1 - Math.min(1,(m.toplineDeviation||0)/0.25))*100);
   const sprop = Math.round((1 - Math.abs((m.bodyLenToHeight||1.6)-1.6)/0.5)*100);
   out.subs.innerHTML = `<b>BCS</b><span>${sbcs}</span><b>Locomoción</b><span>${sloco}</span><b>Dorso</b><span>${stopl}</span><b>Proporciones</b><span>${sprop}</span>`;
 
-  // Precauciones
   const flags=[];
   if((m.hockAngleDeg||150)<130) flags.push('Corvejón cerrado');
   if((m.toplineDeviation||0)>0.18) flags.push('Dorso muy cóncavo');
@@ -167,32 +179,22 @@ function render(j){
   out.flags.innerHTML = flags.map(f=>`<li>${f}</li>`).join('');
   if(flags.length){ out.mainC.style.display='inline-flex'; out.mainC.textContent = flags[0]; } else { out.mainC.style.display='none'; }
 
-  // Barra score
   const sc = Math.max(0,Math.min(100, j.score||0)); out.bar.style.width = sc+'%'; out.bar.style.background = sc>=72? '#22c55e' : sc>=58? '#f59e0b' : '#ef4444';
 
-  // Fortalezas / Debilidades
-  strengthsEl.innerHTML = (j.strengths||[]).map(t=>`<li>${t}</li>`).join('') || '<li>—</li>';
-  weaknessesEl.innerHTML = (j.weaknesses||[]).map(t=>`<li>${t}</li>`).join('') || '<li>—</li>';
+  strengthsEl.innerHTML = (j.strengths||[]).map(t=>`<li>${es(t)}</li>`).join('') || '<li>—</li>';
+  weaknessesEl.innerHTML = (j.weaknesses||[]).map(t=>`<li>${es(t)}</li>`).join('') || '<li>—</li>';
+  out.rtext.textContent = es(j.explanation || '—');
 
-  // Resumen IA
-  out.rtext.textContent = j.explanation || '—';
-
-  // Decisión y rango CRC/kg (con tope superior)
   const v=(j.verdictBand||'').toLowerCase();
-  const base=[1400,1650]; // base CR
+  const base=[1400,1650];
   let adj=[1,1];
-  if(v.includes('muy malo')||v.includes('malo')){ buy.dec.textContent='NO COMPRAR'; buy.dec.className='badge bad'; buy.rng.textContent='—'; buy.note.textContent='Descartado por veredicto/flags.'; return; }
-  else if(v.includes('regular')) adj=[0.9,1.0];
-  else if(v.includes('bueno')) adj=[1.0,1.12];
-  else if(v.includes('excelente')) adj=[1.05,1.20];
+  if(v.includes('muy malo')||v.includes('malo')){ buy.dec.textContent='NO COMPRAR'; buy.dec.className='badge bad'; buy.rng.textContent='—'; buy.note.textContent='Estructura/condición no apta para engorde eficiente.'; return; }
+  else if(v.includes('regular')){ adj=[0.9,1.0]; buy.dec.textContent='COMPRAR (conservador)'; buy.dec.className='badge warn'; buy.note.textContent='Oferta en tramo bajo del rango local.'; }
+  else if(v.includes('bueno')){ adj=[1.0,1.12]; buy.dec.textContent='COMPRAR'; buy.dec.className='badge ok'; buy.note.textContent='Se admite algo sobre promedio.'; }
+  else if(v.includes('excelente')){ adj=[1.05,1.20]; buy.dec.textContent='COMPRAR'; buy.dec.className='badge ok'; buy.note.textContent='Rango alto sin llegar al tope.'; }
 
-  let recMin=Math.round(base[0]*adj[0]), recMax=Math.round(base[1]*adj[1]);
-  // Tope típico observado por ti (~₡1,800/kg)
-  recMax = Math.min(recMax, 1800);
-
-  buy.dec.textContent='COMPRAR'; buy.dec.className='badge ok';
+  let recMin=Math.round(base[0]*adj[0]), recMax=Math.round(base[1]*adj[1]); recMax=Math.min(recMax,1800);
   buy.rng.textContent=new Intl.NumberFormat('es-CR').format(recMin)+' – '+new Intl.NumberFormat('es-CR').format(recMax)+' CRC/kg';
-  buy.note.textContent = v.includes('regular')?'Conservador: tramo bajo del rango.': v.includes('bueno')?'Puede pagarse algo sobre promedio.': v.includes('excelente')?'Rango alto sin llegar a tope.':'—';
 }
 health();
 </script>

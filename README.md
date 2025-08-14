@@ -1,1 +1,1 @@
-GanadoPro v51 (ES completo): análisis + compra/no compra + rango CRC/kg. Deploy en Vercel.
+GanadoPro v52 (ES forzado): análisis + compra/no compra + traducción garantizada. Deploy en Vercel.

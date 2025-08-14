@@ -10,29 +10,19 @@ function estimateBCS5({bellyDepthRatio,toplineDeviation,rumpSlope,hockAngleDeg})
   if(Number.isFinite(hockAngleDeg)&&hockAngleDeg<125) base-=0.2;
   return clamp(+base.toFixed(1),1,5);
 }
-function cebuAdjustment(bcs5,m){
-  const okTop=(m.toplineDeviation??0.08)<=0.12;
-  const okHock=(m.hockAngleDeg??145)>=135;
-  const okBelly=(m.bellyDepthRatio??0.56)>=0.48 && (m.bellyDepthRatio??0.56)<=0.70;
-  if(bcs5<=2.2 && okTop && okHock && okBelly){ bcs5=Math.max(3.2,bcs5+1.2);}
-  return clamp(+bcs5.toFixed(1),1,5);
-}
-function subScores(m,bcs5){
-  const sBCS=Math.round((clamp(bcs5,1,5)-1)/4*100);
-  const sLoco=Math.round((1-Math.min(1,Math.abs((m.hockAngleDeg??145)-145)/35))*100);
-  const sTop=Math.round((1-Math.min(1,(m.toplineDeviation??0)/0.25))*100);
-  const sProp=Math.round((1-Math.min(1,Math.abs((m.bodyLenToHeight??1.6)-1.6)/0.5))*100);
-  return {sBCS,sLoco,sTop,sProp};
-}
-function makeExplanation(m,bcs9){
-  const f=[];
-  if(bcs9>=6) f.push('Buena cobertura muscular sin exceso de grasa.');
-  if((m.toplineDeviation??0)<=0.10) f.push('Línea dorsal recta/estable.');
-  if((m.hockAngleDeg??145)>=135) f.push('Ángulo de corvejón funcional.');
-  if((m.bellyDepthRatio??0.56)>=0.50 && (m.bellyDepthRatio??0.56)<=0.70) f.push('Abdomen con capacidad digestiva adecuada.');
-  if(!f.length) f.push('Proporciones correctas y locomoción aceptable.');
-  return f.join(' ');
-}
+function toESArray(arr){ if(!Array.isArray(arr)) return []; return arr.map(s=>String(s)
+ .replace(/good body length/ig,'Buen largo corporal')
+ .replace(/balanced belly depth/ig,'Profundidad abdominal equilibrada')
+ .replace(/moderate hock angle/ig,'Ángulo de corvejón moderado')
+ .replace(/slight topline deviation/ig,'Ligera desviación de línea dorsal')
+ .replace(/healthy appearance/ig,'Apariencia saludable')
+); }
+function toES(text){ if(!text) return ''; return String(text)
+ .replace(/^The animal shows/,'El animal presenta')
+ .replace(/good overall health/,'buena condición general')
+ .replace(/good balance in body length and height/,'buen equilibrio entre longitud corporal y alzada')
+ .replace(/However, the hock angle could be improved for better mobility\\./,'Sin embargo, el ángulo de corvejón podría mejorar para una mejor movilidad.'); }
+
 async function openaiJSON(key,model,messages){
   const controller=new AbortController(); const to=setTimeout(()=>controller.abort(),20000);
   try{
@@ -59,28 +49,25 @@ module.exports=async(req,res)=>{
     const imageDataUrl=body?.imageDataUrl; if(!imageDataUrl) return res.status(400).end(JSON.stringify({error:'Missing imageDataUrl'}));
 
     const key=process.env.OPENAI_API_KEY; const model=process.env.OPENAI_MODEL||'gpt-4o-mini';
+
+    const sys=`Eres evaluador morfológico de bovinos cebuinos (Brahman y cruces) para ENGORDE.
+Responde SIEMPRE en ESPAÑOL neutro y devuelve SOLO JSON válido. No inventes si algo no se ve claro; usa null.
+Estructura obligatoria:
+{ "bcs9":n|null,"bcs5":n|null,"sex":"macho"|"hembra"|null,"categoryGuess":"ternero"|"novillo"|"toro"|"vaquilla"|"vaca"|null,"ageGuessMonths":n|null,"weightGuessKg":n|null,"morphology":{"bodyLenToHeight":n|null,"bellyDepthRatio":n|null,"hockAngleDeg":n|null,"toplineDeviation":n|null,"rumpSlope":n|null},"strengths":[], "weaknesses":[], "explanation":"" }`;
+    const user={type:'text',text:`Analiza la imagen y devuelve SOLO JSON (en español).
+Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAngleDeg 130–160; toplineDeviation 0.00–0.20; rumpSlope -0.10–0.25`};
+    const content=[user,{type:'image_url',image_url:{url:imageDataUrl,detail:'high'}}];
+
+    // Safe demo si no hay API KEY
     const safeDemo=()=>{
       const morphology={bodyLenToHeight:1.60,bellyDepthRatio:0.58,hockAngleDeg:145,rumpSlope:0.08,toplineDeviation:0.08};
       let bcs5=3.6; const bcs9=+(2*bcs5-1).toFixed(1);
-      const score=84,verdictBand='Bueno'; const subs=subScores(morphology,bcs5);
-      return {source:'heuristic',morphology,bcs:+bcs5.toFixed(1),bcs9,score,verdictBand,subs,explanation:makeExplanation(morphology,bcs9),strengths:['Línea dorsal estable','Ángulo de corvejón funcional'],weaknesses:[]};
+      const score=84,verdictBand='Bueno';
+      return {source:'heuristic',morphology,bcs:+bcs5.toFixed(1),bcs9,score,verdictBand,strengths:['Línea dorsal estable','Ángulo de corvejón funcional'],weaknesses:[],explanation:'Estructura correcta para engorde.'};
     };
-    if(!key) return res.status(200).end(JSON.stringify(safeDemo()));
+    if(!key){ return res.status(200).end(JSON.stringify(safeDemo())); }
 
-    let out;
-    try{
-      const sys=`Eres evaluador morfológico de bovinos cebuinos (Brahman y cruces) para engorde. Devuelves SOLO JSON, sin texto adicional. No inventes si algo no se ve claro.`;
-      const user={type:'text',text:`Desde la imagen devuelve JSON con:
-- bcs9 (1–9) y bcs5 (1–5)
-- morphology { bodyLenToHeight, bellyDepthRatio, hockAngleDeg, rumpSlope, toplineDeviation }
-- sex, categoryGuess, ageGuessMonths, weightGuessKg
-- strengths[], weaknesses[], explanation (1–2 frases)
-Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAngleDeg 130–160; toplineDeviation 0.00–0.20; rumpSlope -0.10–0.25.`};
-      const content=[user,{type:'image_url',image_url:{url:imageDataUrl,detail:'high'}}];
-      out=await openaiJSON(key,model,[{role:'system',content:sys},{role:'user',content:content}]);
-    }catch(e){
-      return res.status(200).end(JSON.stringify(safeDemo()));
-    }
+    let out=await openaiJSON(key,model,[{role:'system',content:sys},{role:'user',content:content}]);
 
     const m=out.morphology||{};
     const morph={
@@ -95,12 +82,14 @@ Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAn
     if(!Number.isFinite(bcs5) && Number.isFinite(bcs9)) bcs5=0.5*bcs9+0.5;
     if(!Number.isFinite(bcs9) && Number.isFinite(bcs5)) bcs9=2*bcs5-1;
     if(!Number.isFinite(bcs5)) bcs5=estimateBCS5(morph);
-    const sweetTop=(morph.toplineDeviation??0.08)<=0.10, sweetHock=(morph.hockAngleDeg??145)>=135, sweetBelly=(morph.bellyDepthRatio??0.56)>=0.48 && (morph.bellyDepthRatio??0.56)<=0.70;
-    if((bcs9??(2*bcs5-1))<=4.5 && sweetTop && sweetHock && sweetBelly){ bcs9=Math.max(5.2, Math.min(6.2, (bcs9??(2*bcs5-1))+1.5)); }
+
+    // calibración "flaco sano" cebuino
+    const okTop=(morph.toplineDeviation??0.08)<=0.10, okHock=(morph.hockAngleDeg??145)>=135, okBelly=(morph.bellyDepthRatio??0.56)>=0.48 && (morph.bellyDepthRatio??0.56)<=0.70;
+    if((bcs9??(2*bcs5-1))<=4.5 && okTop && okHock && okBelly){ bcs9=Math.max(5.2, Math.min(6.2, (bcs9??(2*bcs5-1))+1.5)); }
     if(!Number.isFinite(bcs9)) bcs9=+(2*bcs5-1).toFixed(1);
     bcs5=+(0.5*bcs9+0.5).toFixed(1);
 
-    // Score (morfología > grasa)
+    // Score
     const sProp=1 - Math.min(1, Math.abs((morph.bodyLenToHeight ?? 1.6) - 1.6) / 0.5);
     const sTop =1 - Math.min(1, (morph.toplineDeviation ?? 0) / 0.22);
     const sHock=1 - Math.min(1, Math.abs((morph.hockAngleDeg ?? 145) - 145) / 30);
@@ -108,35 +97,31 @@ Valores típicos: bodyLenToHeight 1.4–1.8; bellyDepthRatio 0.45–0.70; hockAn
     const score=Math.round(100*(0.34*sProp + 0.28*sTop + 0.20*sHock + 0.18*sBCS));
     const verdictBand= score>=90? 'Excelente' : score>=72? 'Bueno' : score>=58? 'Regular' : score>=45? 'Malo' : 'Muy malo';
 
-    // Decisión + rango CRC/kg con tope ~1800
-    let decision='COMPRAR', rng=[1400,1650], adj=[1,1], note='—';
-    const v = verdictBand.toLowerCase();
-    if(v.includes('muy malo')||v.includes('malo')){ decision='NO COMPRAR'; rng=null; note='Descartado por veredicto/flags.'; }
-    else if(v.includes('regular')){ adj=[0.9,1.0]; note='Conservador: tramo bajo del rango.'; }
-    else if(v.includes('bueno')){ adj=[1.0,1.12]; note='Puede pagarse algo sobre promedio.'; }
-    else if(v.includes('excelente')){ adj=[1.05,1.20]; note='Rango alto sin llegar a tope.'; }
-    let priceMin=null, priceMax=null;
-    if(rng){ priceMin=Math.round(rng[0]*adj[0]); priceMax=Math.round(rng[1]*adj[1]); priceMax=Math.min(priceMax,1800); }
+    // Compra / no compra
+    const critical = (morph.hockAngleDeg??999)<125 || (morph.toplineDeviation??0)>0.22 || (bcs5??3)<1.8;
+    let decision='COMPRAR', note='—';
+    if(['muy malo','malo'].some(t=>verdictBand.toLowerCase().includes(t))||critical){ decision='NO COMPRAR'; note='Estructura/condición no apta para engorde eficiente.'; }
+    else if(verdictBand.toLowerCase().includes('regular')){ decision='COMPRAR (conservador)'; note='Oferta en tramo bajo del rango.'; }
+    else if(verdictBand.toLowerCase().includes('bueno')){ decision='COMPRAR'; note='Puede pagarse levemente sobre promedio.'; }
+    else if(verdictBand.toLowerCase().includes('excelente')){ decision='COMPRAR'; note='Rango alto sin llegar al tope.'; }
+
+    const strengths=toESArray(out.strengths||[]);
+    const weaknesses=toESArray(out.weaknesses||[]);
+    const explanation=toES(out.explanation||'Estructura y condición adecuadas para engorde.');
 
     const payload={
       source:'openai',
       morphology:morph,
       bcs:+clamp(+bcs5.toFixed(1),1,5),
       bcs9:+clamp(+bcs9.toFixed(1),1,9),
-      sex:out.sex||null,
-      categoryGuess:out.categoryGuess||null,
-      ageGuessMonths:out.ageGuessMonths||null,
-      weightGuessKg:out.weightGuessKg||null,
-      strengths:Array.isArray(out.strengths)?out.strengths.slice(0,6):[],
-      weaknesses:Array.isArray(out.weaknesses)?out.weaknesses.slice(0,6):[],
+      sex: out.sex || null,
+      categoryGuess: out.categoryGuess || null,
+      ageGuessMonths: out.ageGuessMonths || null,
+      weightGuessKg: out.weightGuessKg || null,
+      strengths, weaknesses, explanation,
       score:Math.max(0,Math.min(100,score)),
       verdictBand,
-      subs: subScores(morph,bcs5),
-      explanation: out.explanation || makeExplanation(morph,bcs9),
-      decision,
-      priceMinCRCkg: priceMin,
-      priceMaxCRCkg: priceMax,
-      note
+      decision, note
     };
     return res.status(200).end(JSON.stringify(payload));
   }catch(err){

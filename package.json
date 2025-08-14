@@ -1,8 +1,8 @@
 {
-  "name": "ganadopro-v51-es-completo",
+  "name": "ganadopro-v52-es-forzado",
   "version": "1.0.0",
   "private": true,
-  "description": "GanadoPro AI v51 (ES) - Análisis + compra/no compra + rango CRC/kg",
+  "description": "GanadoPro AI v52 (ES forzado): análisis + compra/no compra + traducción garantizada",
   "scripts": { "build": "echo \"No build step\"", "start": "echo \"Use vercel dev\"" },
   "engines": { "node": ">=18.x" }
 }
