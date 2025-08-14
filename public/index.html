@@ -2,17 +2,17 @@
 <html lang='es'>
 <head>
 <meta charset='utf-8'>
-<meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>GanadoPro • v54 (Engorde)</title>
+<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'>
+<title>GanadoPro • v57b (Engorde)</title>
 <style>
-:root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
+:root{--bg:#0b1220;--ink:#e5e7eb;--muted:#9ca3af;--card:#0f172a;--line:#1f2937}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
 header{display:flex;align-items:center;gap:10px}
 .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#14b8a6);display:grid;place-items:center;color:#0b1220;font-weight:900}
 .pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:#9ca3af;background:#0b1325}
 .row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.card{background:#0f172a;border:1px solid var(--line);border-radius:16px;padding:14px}
 .btn{background:#22c55e;color:#0b1220;border:none;border-radius:12px;padding:12px 16px;font-size:16px;cursor:pointer;font-weight:700}
 .btn.ghost{background:transparent;color:#fff;border:1px solid var(--line)}
 .grid{display:grid;gap:12px}
@@ -25,7 +25,7 @@ header{display:flex;align-items:center;gap:10px}
 .preview{max-width:100%;border-radius:12px;border:1px solid var(--line)}
 pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);padding:8px;border-radius:8px;color:#9ca3af;max-height:220px;overflow:auto}
 .list{margin:6px 0 0 18px}
-@media (max-width:900px){.row{grid-template-columns:1fr}.btn.block{width:100%}}
+@media (max-width:900px){.row{grid-template-columns:1fr}.btn.block{width:100%}.kv{grid-template-columns:1fr}}
 .small{font-size:12px;color:#9ca3af}
 .metric{display:grid;grid-template-columns:190px 1fr 140px;gap:8px;align-items:center;margin-bottom:10px}
 .band{height:12px;background:#111827;border-radius:8px;position:relative;overflow:hidden}
@@ -42,8 +42,8 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
   <header>
     <div class='logo'>GP</div>
     <div>
-      <div style='font-weight:800;font-size:20px'>GanadoPro • v54</div>
-      <div class='small'>Bovinos para ENGORDE: métricas en español + bandas por métrica + texto robusto</div>
+      <div style='font-weight:800;font-size:20px'>GanadoPro • v57b</div>
+      <div class='small'>ENGORDE: métricas en español + bandas por métrica + texto robusto</div>
     </div>
     <div style='margin-left:auto;display:flex;gap:8px;align-items:center'>
       <span id='health' class='pill'>API: verificando…</span>
@@ -97,7 +97,7 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
           </div>
         </div>
 
-        <div style='display/grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px'>
+        <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px'>
           <div>
             <div style='font-weight:600;margin-bottom:6px'>Fortalezas</div>
             <ul id='s_strengths' class='list'></ul>
@@ -127,15 +127,14 @@ pre{white-space:pre-wrap;background:#0b1325;border:1px dashed var(--line);paddin
 </div>
 
 <script>
-const $=s=>document.querySelector(s); const nf=new Intl.NumberFormat('es-CR');
-const statusEl=$('#status'), fileEl=$('#file'), img=$('#preview'), imgWrap=$('#imgWrap'), diag=$('#diag');
+const $=s=>document.querySelector(s);
+const statusEl=$('#status'), fileEl=$('#file'), img=$('#preview'), imgWrap=$('#imgWrap'), diag=document.querySelector('#diag');
 const out={ver:$('#r_ver'),score:$('#r_score'),bcs:$('#r_bcs'),sexcat:$('#r_sexcat'),agew:$('#r_agew'),subs:$('#subs'),flags:$('#flags'),mainC:$('#mainC'),bar:$('#scoreBar'),rtext:$('#r_text'),bands:$('#bands')};
 const strengthsEl=$('#s_strengths'), weaknessesEl=$('#s_weak'); const buy={dec:$('#buy_dec'),rng:$('#buy_rng'),note:$('#buy_note')};
-function log(x){ diag.textContent+=(diag.textContent?'\\n':'')+x; }
-async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); $('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave (demo)'; }catch{ $('#health').textContent='API: error'; } }
+function log(x){ if(diag) diag.textContent+=(diag.textContent?'\n':'')+x; }
+async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); document.querySelector('#health').textContent=j.hasKey?('API: OK ('+(j.model||'')+')'):'API: sin llave (demo)'; }catch{ document.querySelector('#health').textContent='API: error'; } }
 async function fileToDataURL(file){ const fr=new FileReader(); return await new Promise((res,rej)=>{ fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 async function compress(file,maxSide=1100,q=0.78){ const url=await fileToDataURL(file); const im=new Image(); im.src=url; await new Promise((res,rej)=>{im.onload=res;im.onerror=rej}); const sc=Math.min(1,maxSide/Math.max(im.naturalWidth,im.naturalHeight)); const w=Math.round(im.naturalWidth*sc),h=Math.round(im.naturalHeight*sc); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d',{alpha:false,desynchronized:true}).drawImage(im,0,0,w,h); let out=c.toDataURL('image/jpeg',q); if(out.length>3_500_000){ const blob=await (await fetch(out)).blob(); return await compress(new File([blob],'img.jpg'),900,0.72);} return out; }
-
 function tagClass(b){ return b==='Bueno'||b==='Excelente'?'ok': b==='Regular'?'warn':'bad'; }
 function bandRow(k, g){
   const pretty = {bodyLenToHeight:'Relación largo–alto', bellyDepthRatio:'Relación profundidad de abdomen', hockAngleDeg:'Ángulo del corvejón (°)', toplineDeviation:'Desviación de línea dorsal', rumpSlope:'Pendiente de grupa'}[k] || k;
@@ -148,7 +147,7 @@ function bandRow(k, g){
   const t=document.createElement('span'); t.className='tag badge '+tagClass(g.band); t.textContent=g.band + ' • ' + (g.value ?? '—'); band.appendChild(t);
   return band;
 }
-$('#reset').onclick=()=>{ img.src=''; imgWrap.style.display='none'; $('#report').style.display='none'; buy.dec.textContent='–'; buy.rng.textContent='–'; buy.note.textContent='—'; statusEl.textContent='Listo'; $('#diag').textContent=''; out.bands.innerHTML=''; };
+$('#reset').onclick=()=>{ img.src=''; imgWrap.style.display='none'; $('#report').style.display='none'; buy.dec.textContent='–'; buy.rng.textContent='–'; buy.note.textContent='—'; statusEl.textContent='Listo'; if(diag) diag.textContent=''; out.bands.innerHTML=''; };
 
 $('#analyze').onclick=async()=>{
   try{
@@ -163,24 +162,20 @@ $('#analyze').onclick=async()=>{
 };
 
 function render(j){
-  statusEl.textContent='Listo'; $('#report').style.display='block';
+  statusEl.textContent='Listo'; document.querySelector('#report').style.display='block';
   const m=j.morphology||{};
-
   out.ver.textContent=(j.verdictBand||'—');
   out.score.textContent=(j.score??'—');
   out.bcs.textContent=(j.bcs??'—')+(j.bcs9?(' / '+j.bcs9+' (1–9)'):''); 
   out.sexcat.textContent=[j.sex,j.categoryGuess].filter(Boolean).join(' • ')||'—';
   out.agew.textContent=[j.ageGuessMonths?j.ageGuessMonths+' m':'', j.weightGuessKg?j.weightGuessKg+' kg':''].filter(Boolean).join(' • ')||'—';
-
   out.bands.innerHTML='';
   if (j.metricGrades){ Object.keys(j.metricGrades).forEach(k=> out.bands.appendChild(bandRow(k, j.metricGrades[k])) ); }
-
   const sbcs = Math.round((Math.max(1,Math.min(5, j.bcs||3))-1)/4*100);
   const sloco = Math.round((1 - Math.abs((m.hockAngleDeg||145)-145)/35)*100);
   const stopl = Math.round((1 - Math.min(1,(m.toplineDeviation||0)/0.25))*100);
   const sprop = Math.round((1 - Math.abs((m.bodyLenToHeight||1.6)-1.6)/0.5)*100);
   out.subs.innerHTML = `<b>BCS</b><span>${sbcs}</span><b>Locomoción</b><span>${sloco}</span><b>Dorso</b><span>${stopl}</span><b>Proporciones</b><span>${sprop}</span>`;
-
   const flags=[];
   if((m.hockAngleDeg||150)<130) flags.push('Corvejón cerrado');
   if((m.toplineDeviation||0)>0.18) flags.push('Dorso muy cóncavo');
@@ -188,13 +183,10 @@ function render(j){
   if((j.bcs||0)<2.3) flags.push('BCS bajo');
   out.flags.innerHTML = flags.map(f=>`<li>${f}</li>`).join('');
   if(flags.length){ out.mainC.style.display='inline-flex'; out.mainC.textContent = flags[0]; } else { out.mainC.style.display='none'; }
-
   const sc = Math.max(0,Math.min(100, j.score||0)); out.bar.style.width = sc+'%'; out.bar.style.background = sc>=72? '#22c55e' : sc>=58? '#f59e0b' : '#ef4444';
-
   strengthsEl.innerHTML = (j.strengths||[]).map(t=>`<li>${t}</li>`).join('') || '<li>—</li>';
   weaknessesEl.innerHTML = (j.weaknesses||[]).map(t=>`<li>${t}</li>`).join('') || '<li>—</li>';
   out.rtext.textContent = j.explanation || '—';
-
   const v=(j.verdictBand||'').toLowerCase();
   const base=[1400,1650];
   let adj=[1,1];
