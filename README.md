@@ -1,11 +1,12 @@
-# GanadoPro v58g (ES) — Vercel
-Corrección crítica: JSON garantizado desde `/api/analyze` (se sustituyó `or` por `||` en veredicto).
+# GanadoBravo v39 — Full functional
 
-## Novedades
-- Doble validación (2 pasadas) + gating estricto (BCS<2.8 o ≥3 métricas “Malo”).
-- Debilidades siempre presentes; tipo racial estimado.
-- UI en español con bandas por métrica.
-- En errores, la API devuelve **JSON** con `detail` (stack).
-
-## Deploy
-Importa el ZIP en Vercel. Prueba `/api/health` y luego la UI.
+- FastAPI backend with real pipeline (`pipeline_real.py`) — no external AI calls.
+- UI renders **all morphological metrics** and **all health conditions** (each marked as *Descartado* or *Sospecha*).
+- Endpoints:
+  - `GET /` — SPA
+  - `POST /evaluate` — form-data (`file`, `mode` = `levante`|`subasta`)
+- Run locally:
+  ```bash
+  pip install fastapi uvicorn pillow
+  uvicorn main:app --reload --port 8000
+  ```
